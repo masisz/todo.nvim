@@ -66,6 +66,44 @@ local function complete()
   vim.notify(string.format("Completed %d todo(s)", count))
 end
 
+local function delete_selected()
+  local selected, labels = {}, {}
+  for _, todo in ipairs(state.todos) do
+    if state.selected[todo.path] then
+      selected[#selected + 1] = todo
+      labels[#labels + 1] = todo.label
+    end
+  end
+  if #selected == 0 then
+    vim.notify("Select todos to delete", vim.log.levels.INFO)
+    return
+  end
+  local prompt = string.format("Permanently delete %d todo(s)?\n\n%s", #selected, table.concat(labels, "\n"))
+  if vim.fn.confirm(prompt, "&Yes\n&No", 2) ~= 1 then
+    return
+  end
+  local count = 0
+  for _, todo in ipairs(selected) do
+    local buf = vim.fn.bufnr(todo.path)
+    if buf ~= -1 and vim.bo[buf].modified then
+      vim.notify("Save todo before deleting: " .. todo.name, vim.log.levels.WARN)
+    else
+      local ok, err = vim.uv.fs_unlink(todo.path)
+      if ok then
+        if buf ~= -1 then
+          vim.api.nvim_buf_delete(buf, { force = false })
+        end
+        state.selected[todo.path] = nil
+        count = count + 1
+      else
+        vim.notify("Cannot delete " .. todo.name .. ": " .. tostring(err), vim.log.levels.ERROR)
+      end
+    end
+  end
+  refresh()
+  vim.notify(string.format("Deleted %d todo(s)", count))
+end
+
 function M.open()
   if state and vim.api.nvim_win_is_valid(state.win) and vim.api.nvim_buf_is_valid(state.buf)
       and vim.api.nvim_win_get_buf(state.win) == state.buf then
@@ -97,6 +135,7 @@ function M.open()
     end
   end, { buffer = buf, desc = "Select todo" })
   vim.keymap.set("n", "<CR>", complete, { buffer = buf, desc = "Complete selected todos" })
+  vim.keymap.set("n", "x", delete_selected, { buffer = buf, desc = "Delete selected todos with confirmation" })
   vim.keymap.set("n", "c", function()
     local selected = {}
     for _, todo in ipairs(state.todos) do

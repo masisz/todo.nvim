@@ -61,6 +61,9 @@ require("todo").setup({
   toggle selection and Enter to move selected todos into `done/` within the todo
   directory. Press `r` to refresh or `q` to close. Save modified todos before
   completing them; existing files in `done/` are never overwritten.
+  Press `x` to permanently delete selected todos after confirmation. The
+  confirmation lists the selected titles and defaults to No. Modified todos
+  must be saved before deletion.
 
 `TaskNew` and `TaskList` remain available as compatibility aliases.
 
