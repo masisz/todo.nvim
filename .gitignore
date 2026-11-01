@@ -2,3 +2,10 @@
 *.log
 .tests
 doc/tags
+
+# Neovim temporary files
+*.swp
+*.swo
+*.swn
+*.un~
+*~

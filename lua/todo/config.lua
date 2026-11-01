@@ -1,17 +1,17 @@
 local M = {}
 
 ---@class TodoConfig
----@field directory string Directory to store todo task files (default: "~/tasks")
----@field extension string File extension for task files (default: "task")
+---@field directory string Directory to store todo files (default: "~/todos")
+---@field extension string File extension for todo files (default: "todo")
 ---@field date_format string Date format for filename prefix (default: "%Y%m%d")
----@field template (string|fun():string)[] Default template lines for new tasks
+---@field template (string|fun():string)[] Default template lines for new todos
 ---@field cursor_pos number[] Initial cursor position [line, col] (1-indexed, default: { 2, 0 })
 ---@field start_insert boolean Whether to start in insert mode (default: true)
 
 ---@type TodoConfig
 M.defaults = {
-  directory = "~/tasks",
-  extension = "task",
+  directory = "~/todos",
+  extension = "todo",
   date_format = "%Y%m%d",
   template = {
     "[Title]",
@@ -23,7 +23,7 @@ M.defaults = {
       return os.date("%Y-%m-%d")
     end,
     "[Duration]",
-    "1h",
+    "30m",
   },
   cursor_pos = { 2, 0 },
   start_insert = true,

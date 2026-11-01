@@ -9,9 +9,9 @@ function M.setup(opts)
   config.setup(opts)
 end
 
---- Create a new todo task
+--- Create a new todo
 ---@param opts? table
----@return string Filepath of the newly created task
+---@return string Filepath of the newly created todo
 function M.create(opts)
   return creator.create_task(opts)
 end
@@ -19,7 +19,12 @@ end
 -- Backward compatibility with my_task
 M.create_task = M.create
 
---- Parse task buffer lines into metadata and memo
+--- Open the todo list in a right-hand pane.
+function M.list()
+  require("todo.list").open()
+end
+
+--- Parse todo buffer lines into metadata and memo
 --- A known section heading on its own line starts the next field.
 ---@param lines string[]
 ---@return { meta: table<string, string>, memo: string }

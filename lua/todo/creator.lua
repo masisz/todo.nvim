@@ -2,7 +2,7 @@ local config = require("todo.config")
 
 local M = {}
 
---- Generate next unused task file path
+--- Generate next todo file path unused in both the todo and done directories
 ---@param directory string
 ---@param date_format string
 ---@param extension string
@@ -11,10 +11,14 @@ local function get_next_path(directory, date_format, extension)
   local date = os.date(date_format)
   local seq = 1
   local path
+  local done_path
   repeat
-    path = vim.fs.joinpath(directory, string.format("%s-%02d.%s", date, seq, extension))
+    local name = string.format("%s-%02d.%s", date, seq, extension)
+    path = vim.fs.joinpath(directory, name)
+    done_path = vim.fs.joinpath(directory, "done", name)
     seq = seq + 1
   until not vim.uv.fs_stat(path) and vim.fn.bufnr(path) == -1
+    and not vim.uv.fs_stat(done_path) and vim.fn.bufnr(done_path) == -1
   return path
 end
 
@@ -33,9 +37,9 @@ local function resolve_template(template)
   return lines
 end
 
---- Create and open a new todo task file
+--- Create and open a new todo file
 ---@param opts? table
----@return string Filepath of the newly created task
+---@return string Filepath of the newly created todo
 function M.create_task(opts)
   local opts_merged = vim.tbl_deep_extend("force", config.options, opts or {})
 
