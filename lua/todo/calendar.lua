@@ -39,6 +39,7 @@ function M.url(todo, start, provider)
     return "https://" .. host .. "/calendar/0/deeplink/compose?path=%2Fcalendar%2Faction%2Fcompose&rru=addevent&subject="
       .. encode(todo.meta.Title or "") .. "&startdt=" .. encode(os.date("!%Y-%m-%dT%H:%M:%SZ", first))
       .. "&enddt=" .. encode(os.date("!%Y-%m-%dT%H:%M:%SZ", last)) .. "&body=" .. encode(todo.memo)
+      .. "&freebusy=free"
   elseif provider and provider ~= "google" then
     return nil, "Unknown calendar provider: " .. tostring(provider)
   end

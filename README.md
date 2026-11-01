@@ -77,6 +77,10 @@ Duration defaults to `30m`. Confirm and save in the browser or calendar app. Can
 stops the remaining prompts. Scheduling does not mark todos as done, and
 repeating the operation opens new drafts rather than updating existing events.
 
+Outlook links request "Show as: Free" using `freebusy=free`. This deep-link
+parameter is undocumented by Microsoft; verify the availability setting in the
+event editor before saving.
+
 ## License
 
 [MIT](LICENSE)
