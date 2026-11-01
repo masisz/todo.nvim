@@ -14,7 +14,7 @@ vim.api.nvim_create_user_command("TodoList", function()
   require("todo").list()
 end, { desc = "Select and complete todos in a right-hand pane" })
 
-vim.keymap.set("n", "<Space>Tl", "<Cmd>TodoList<CR>", { desc = "Open todo list" })
+vim.keymap.set("n", "<leader>Tl", "<Cmd>TodoList<CR>", { desc = "Open todo list" })
 
 vim.api.nvim_create_user_command("TodoNew", function()
   require("todo").create()
