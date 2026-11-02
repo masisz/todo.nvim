@@ -104,6 +104,31 @@ local function delete_selected()
   vim.notify(string.format("Deleted %d todo(s)", count))
 end
 
+--- Open the todo under the cursor for editing, keeping the list pane open.
+local function edit_todo()
+  local todo = state.todos[vim.api.nvim_win_get_cursor(0)[1]]
+  if not todo then return end
+  -- Prefer the window the user came from; otherwise any normal window in this tab.
+  local target = vim.fn.win_getid(vim.fn.winnr("#"))
+  local function usable(win)
+    return win ~= 0 and win ~= state.win and vim.api.nvim_win_is_valid(win)
+      and vim.api.nvim_win_get_config(win).relative == ""
+  end
+  if not usable(target) then
+    target = nil
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if usable(win) then target = win break end
+    end
+  end
+  local path = vim.fn.fnameescape(todo.path)
+  if target then
+    vim.api.nvim_set_current_win(target)
+    vim.cmd("edit " .. path)
+  else
+    vim.cmd("topleft vsplit " .. path)
+  end
+end
+
 function M.open()
   if state and vim.api.nvim_win_is_valid(state.win) and vim.api.nvim_buf_is_valid(state.buf)
       and vim.api.nvim_win_get_buf(state.win) == state.buf then
@@ -143,6 +168,7 @@ function M.open()
     end
     require("todo.calendar").schedule(selected)
   end, { buffer = buf, desc = "Schedule selected todos in a calendar" })
+  vim.keymap.set("n", "o", edit_todo, { buffer = buf, desc = "Edit todo under cursor" })
   vim.keymap.set("n", "r", refresh, { buffer = buf, desc = "Refresh todos" })
   vim.keymap.set("n", "q", "<Cmd>close<CR>", { buffer = buf, desc = "Close todo list" })
   refresh()
