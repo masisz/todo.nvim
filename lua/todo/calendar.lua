@@ -55,7 +55,9 @@ local function escape(value)
 end
 
 --- Serialize an RFC 5545 event with CRLF and UTF-8-safe line folding.
-function M.ics(todo, start)
+--- With opts.free, the event is marked as free time (TRANSP and Outlook's busy status).
+function M.ics(todo, start, opts)
+  opts = opts or {}
   local first, last = times(todo, start)
   if not first then return nil, last end
   local lines = {
@@ -65,8 +67,11 @@ function M.ics(todo, start)
     "DTSTART:" .. os.date("!%Y%m%dT%H%M%SZ", first),
     "DTEND:" .. os.date("!%Y%m%dT%H%M%SZ", last),
     "SUMMARY:" .. escape(todo.meta.Title or ""), "DESCRIPTION:" .. escape(todo.memo),
-    "END:VEVENT", "END:VCALENDAR",
   }
+  if opts.free then
+    vim.list_extend(lines, { "TRANSP:TRANSPARENT", "X-MICROSOFT-CDO-BUSYSTATUS:FREE" })
+  end
+  vim.list_extend(lines, { "END:VEVENT", "END:VCALENDAR" })
   local folded = {}
   for _, line in ipairs(lines) do
     while #line > 75 do
@@ -80,15 +85,17 @@ function M.ics(todo, start)
   return table.concat(folded, "\r\n") .. "\r\n"
 end
 
-local function open_event(event, start, provider)
-  if provider ~= "apple" then
-    local url, err = M.url(event, start, provider)
-    if not url then return nil, err end
-    return vim.ui.open(url)
+local function open_url(url)
+  -- Neovim 0.12 opens URLs on Windows via `cmd.exe /c start`, which treats `&`
+  -- as a command separator and drops every query parameter after the first one.
+  -- Hand the URL to the shell URL handler directly (as Neovim 0.10/0.11 did).
+  if vim.fn.has("win32") == 1 and vim.fn.executable("rundll32") == 1 then
+    return vim.system({ "rundll32", "url.dll,FileProtocolHandler", url }, { detach = true })
   end
-  if vim.fn.has("mac") ~= 1 then return nil, "Apple Calendar requires macOS" end
-  local content, err = M.ics(event, start)
-  if not content then return nil, err end
+  return vim.ui.open(url)
+end
+
+local function write_ics(content)
   local directory = vim.fs.joinpath(vim.fn.stdpath("cache"), "todo", "calendar")
   vim.fn.mkdir(directory, "p")
   local path = vim.fs.joinpath(directory, vim.fn.sha256(content) .. ".ics")
@@ -97,6 +104,31 @@ local function open_event(event, start, provider)
   local written, write_err = file:write(content)
   file:close()
   if not written then return nil, write_err end
+  return path
+end
+
+local function open_event(event, start, provider)
+  if provider == "outlook_desktop" then
+    if vim.fn.has("win32") ~= 1 then return nil, "Outlook desktop requires Windows" end
+    local content, err = M.ics(event, start, { free = true })
+    if not content then return nil, err end
+    local path, write_err = write_ics(content)
+    if not path then return nil, write_err end
+    -- Opens with the app associated with .ics files (normally Outlook).
+    -- explorer.exe accepts quoted paths (user names with spaces) and avoids cmd.exe parsing.
+    local windows_path = (vim.fs.normalize(path):gsub("/", "\\"))
+    return vim.system({ "explorer.exe", windows_path }, { detach = true })
+  end
+  if provider ~= "apple" then
+    local url, err = M.url(event, start, provider)
+    if not url then return nil, err end
+    return open_url(url)
+  end
+  if vim.fn.has("mac") ~= 1 then return nil, "Apple Calendar requires macOS" end
+  local content, err = M.ics(event, start)
+  if not content then return nil, err end
+  local path, write_err = write_ics(content)
+  if not path then return nil, write_err end
   return vim.system({ "open", "-a", "Calendar", path }, {}, function(result)
     if result.code ~= 0 then
       vim.schedule(function() vim.notify("Cannot open Apple Calendar: " .. result.stderr, vim.log.levels.ERROR) end)
@@ -115,6 +147,7 @@ function M.schedule(todos, provider)
       { id = "google", label = "Google Calendar" },
       { id = "outlook", label = "Outlook.com (personal)" },
       { id = "outlook_work", label = "Outlook (Microsoft 365)" },
+      { id = "outlook_desktop", label = "Outlook desktop (Windows, ICS)" },
       { id = "apple", label = "Apple Calendar (macOS)" },
     }
     vim.ui.select(providers, {
