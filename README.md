@@ -68,11 +68,15 @@ require("todo").setup({
 `TaskNew` and `TaskList` remain available as compatibility aliases.
 
 In the todo list, select todos with Space and press `c` to schedule them in
-Google Calendar, Outlook.com, Outlook for Microsoft 365, or Apple Calendar.
+Google Calendar, Outlook.com, Outlook for Microsoft 365, Outlook desktop
+(Windows), or Apple Calendar.
 Choose the provider when prompted (requires Neovim 0.10+). Enter a local start time
 as `YYYY-MM-DD HH:MM` for each selected todo; the default is its Due date at
-09:00. Google and Outlook open in your browser. Apple Calendar requires macOS
+09:00. Google, Outlook.com, and Microsoft 365 open in your browser. Apple Calendar requires macOS
 and opens an ICS file in the Calendar app; choose a calendar and import it.
+Outlook desktop requires Windows and opens an ICS file with the app associated
+with `.ics` files (normally Outlook); the event is marked "Show as: Free" via
+`TRANSP:TRANSPARENT` and `X-MICROSOFT-CDO-BUSYSTATUS:FREE`. Save it in Outlook.
 Generated ICS files are kept under `stdpath("cache")/todo/calendar/`.
 A separate event editor/import opens for each todo with its Title, Memo, and
 Duration filled in. Supported durations are `30m`, `1h`, and `1h30m`; an empty
