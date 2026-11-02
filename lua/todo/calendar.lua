@@ -80,11 +80,21 @@ function M.ics(todo, start)
   return table.concat(folded, "\r\n") .. "\r\n"
 end
 
+local function open_url(url)
+  -- Neovim 0.12 opens URLs on Windows via `cmd.exe /c start`, which treats `&`
+  -- as a command separator and drops every query parameter after the first one.
+  -- Hand the URL to the shell URL handler directly (as Neovim 0.10/0.11 did).
+  if vim.fn.has("win32") == 1 and vim.fn.executable("rundll32") == 1 then
+    return vim.system({ "rundll32", "url.dll,FileProtocolHandler", url }, { detach = true })
+  end
+  return vim.ui.open(url)
+end
+
 local function open_event(event, start, provider)
   if provider ~= "apple" then
     local url, err = M.url(event, start, provider)
     if not url then return nil, err end
-    return vim.ui.open(url)
+    return open_url(url)
   end
   if vim.fn.has("mac") ~= 1 then return nil, "Apple Calendar requires macOS" end
   local content, err = M.ics(event, start)
