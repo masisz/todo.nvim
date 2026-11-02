@@ -59,7 +59,9 @@ require("todo").setup({
 - `:TodoNew` - Create and open a new todo file.
 - `:TodoList` / `<leader>Tl` - Open todos in a right-hand pane. Press Space to
   toggle selection and Enter to move selected todos into `done/` within the todo
-  directory. Press `r` to refresh or `q` to close. Save modified todos before
+  directory. Press `o` to edit the todo under the cursor (it opens in the
+  previous window, or a new split if the list is the only window). Press `r` to
+  refresh or `q` to close. Save modified todos before
   completing them; existing files in `done/` are never overwritten.
   Press `x` to permanently delete selected todos after confirmation. The
   confirmation lists the selected titles and defaults to No. Modified todos
