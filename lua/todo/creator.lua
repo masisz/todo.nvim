@@ -61,6 +61,15 @@ function M.create_task(opts)
 
   if opts_merged.start_insert then
     vim.cmd("startinsert!")
+    vim.schedule(function()
+      vim.cmd("startinsert!")
+    end)
+    vim.defer_fn(function()
+      local target_buf = vim.fn.bufnr(path)
+      if target_buf ~= -1 and vim.api.nvim_get_current_buf() == target_buf then
+        vim.cmd("startinsert!")
+      end
+    end, 20)
   end
 
   return path
