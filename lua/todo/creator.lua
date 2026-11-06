@@ -38,19 +38,31 @@ local function resolve_template(template)
 end
 
 --- Create and open a new todo file
+--- opts.kind is "daily" (default) or "roadmap"; opts.roadmap links a daily todo to a milestone id.
 ---@param opts? table
 ---@return string Filepath of the newly created todo
 function M.create_task(opts)
-  local opts_merged = vim.tbl_deep_extend("force", config.options, opts or {})
+  opts = opts or {}
+  local opts_merged = vim.tbl_deep_extend("force", config.options, opts)
+  -- Templates are lists: use the given one as a whole instead of merging by index.
+  opts_merged.template = opts.template or config.options.template
+  opts_merged.cursor_pos = opts.cursor_pos or config.options.cursor_pos
+  local kind = opts.kind == "roadmap" and "roadmap" or "daily"
 
-  local directory = vim.fn.fnamemodify(vim.fn.expand(opts_merged.directory), ":p")
+  local directory = opts.directory and vim.fn.fnamemodify(vim.fn.expand(opts.directory), ":p")
+    or config.dir(kind)
   vim.fn.mkdir(directory, "p")
 
   local path = get_next_path(directory, opts_merged.date_format, opts_merged.extension)
 
   vim.cmd.edit(vim.fn.fnameescape(path))
 
-  local lines = resolve_template(opts_merged.template)
+  local template = kind == "roadmap" and (opts.template or config.options.roadmap_template)
+    or opts_merged.template
+  local lines = resolve_template(template)
+  if opts.roadmap then
+    lines = require("todo.store").set_field(lines, "Roadmap", opts.roadmap)
+  end
   vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
 
   vim.bo.filetype = opts_merged.extension

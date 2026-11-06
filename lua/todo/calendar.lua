@@ -25,7 +25,7 @@ local function times(todo, start)
   end
   local seconds = (tonumber(hours) or 0) * 3600 + (tonumber(minutes) or 0) * 60
   if seconds <= 0 then
-    return nil, "Invalid duration; use 30m, 1h, or 1h30m"
+    return nil, "Calendar durations must be in hours/minutes (e.g. 30m, 2h, 1h30m), got: " .. duration
   end
   return timestamp, timestamp + seconds
 end
