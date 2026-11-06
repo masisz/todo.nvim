@@ -75,42 +75,88 @@ require("todo").setup({
 
 Todos are split by folder:
 
-- `~/todos/` - daily tasks (`30m`, `2h`, `1d`), as before
+- `~/todos/` - daily tasks (`30m`, `2h`, `1d`)
 - `~/todos/roadmap/` - mid/long-term milestones (`2w`, `1M`, `3M`)
 
 A daily todo may belong to a milestone through its `[Roadmap]` field, which
 holds the milestone's file name without extension (e.g. `20261106-01`). Leave
 it empty for a one-off task. Completed items go to `done/` inside each folder.
 
+### Example workflow
+
+1. `:RoadmapNew` and write a milestone, e.g. Title `Release v1`, Duration `1M`.
+2. `:RoadmapList`, move the cursor to `Release v1` and press `n` to add todos
+   for it (e.g. `design`, `impl`). One-off tasks are created with `:TodoNew`
+   as usual.
+3. To attach an existing todo, open `:TodoList`, select it with Space and
+   press `l`, then pick the milestone.
+4. Complete todos in `:TodoList` with Space and Enter. The roadmap shows the
+   progress:
+
+   ```
+   [ ] Release v1  1M  due 2026-12-01  (1/3)
+         - impl  30m
+         - test  2h
+
+   Unlinked todos: 4
+   ```
+
+   `(1/3)` is completed/total linked todos (counting `~/todos/done/`), followed
+   by the milestone's open todos. The last line counts todos not linked to any
+   milestone.
+5. When the milestone is finished, select it in `:RoadmapList` and press Enter.
+
 ## Commands
 
-- `:TodoNew` - Create and open a new todo file.
-- `:TodoList` / `<leader>Tl` - Open todos in a right-hand pane. Press Space to
-  toggle selection and Enter to move selected todos into `done/` within the todo
-  directory. Press `o` to edit the todo under the cursor (it opens in the
-  previous window, or a new split if the list is the only window). Press `r` to
-  refresh or `q` to close. Save modified todos before
-  completing them; existing files in `done/` are never overwritten.
-  Press `x` to permanently delete selected todos after confirmation. The
-  confirmation lists the selected titles and defaults to No. Modified todos
-  must be saved before deletion.
+| Command | Default key | Description |
+| --- | --- | --- |
+| `:TodoNew` | `<leader>Tn`* | Create and open a new daily todo |
+| `:TodoList` | `<leader>Tl` | Open daily todos in a right-hand pane |
+| `:RoadmapNew` | | Create and open a new milestone in `roadmap/` |
+| `:RoadmapList` | `<leader>Tr` | Open milestones with their linked todos in a right-hand pane |
 
-- `:RoadmapNew` - Create a new milestone in `roadmap/`.
-- `:RoadmapList` / `<leader>Tr` - Roadmap mode. Shows each milestone with its
-  Duration, Due date and progress (completed/total linked todos, counting
-  `~/todos/done/`), followed by its open linked todos. The last line shows how
-  many todos are not linked to any milestone.
-  - `n` - create a daily todo linked to the milestone under the cursor
-  - `a` - add a milestone
-  - `o` - edit the milestone or todo under the cursor
-  - Space / Enter / `x` - select / complete / delete milestones
-  - `r` refresh, `q` close
-- In `:TodoList`, each todo shows its Duration and linked milestone
-  (`-> Release v1`). Press `l` to link the selected todos (or the one under
-  the cursor) to a milestone, or choose `(No roadmap)` to unlink. Press `a` to
-  add a todo. Lists refresh when a todo is saved.
+\* Set in the lazy.nvim example above; the plugin itself maps only `<leader>Tl`
+and `<leader>Tr`. `TaskNew` and `TaskList` remain available as compatibility
+aliases.
 
-`TaskNew` and `TaskList` remain available as compatibility aliases.
+### Keys in `:TodoList`
+
+Each todo shows its Duration and linked milestone (`-> Release v1`).
+
+| Key | Action |
+| --- | --- |
+| `Space` | Toggle selection of the todo under the cursor |
+| `Enter` | Move selected todos into `done/` |
+| `x` | Permanently delete selected todos (after confirmation, default No) |
+| `o` | Edit the todo under the cursor |
+| `a` | Add a todo |
+| `l` | Link selected todos (or the one under the cursor) to a milestone; choose `(No roadmap)` to unlink |
+| `c` | Schedule selected todos in a calendar (see below) |
+| `r` | Refresh |
+| `q` | Close |
+
+### Keys in `:RoadmapList`
+
+| Key | Action |
+| --- | --- |
+| `Space` | Toggle selection of the milestone under the cursor |
+| `Enter` | Move selected milestones into `roadmap/done/` |
+| `x` | Permanently delete selected milestones (after confirmation, default No) |
+| `o` | Edit the milestone or todo under the cursor |
+| `n` | Create a daily todo linked to the milestone under the cursor (or the milestone of the todo under the cursor) |
+| `a` | Add a milestone |
+| `r` | Refresh |
+| `q` | Close |
+
+Notes for both lists:
+
+- `o`, `a` and `n` open the file in the previous window, or in a new split if
+  the list is the only window.
+- Save modified files before completing, deleting or linking them. Existing
+  files in `done/` are never overwritten.
+- Open lists refresh automatically when a todo is saved.
+
+## Calendar
 
 In the todo list, select todos with Space and press `c` to schedule them in
 Google Calendar, Outlook.com, Outlook for Microsoft 365, Outlook desktop
