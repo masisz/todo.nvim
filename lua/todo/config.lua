@@ -1,8 +1,7 @@
 local M = {}
 
 ---@class TodoConfig
----@field directory string Root directory for todo files (default: "~/todos")
----@field daily_dir string Subdirectory for daily todos (default: "daily"; "" uses `directory` itself)
+---@field directory string Directory for daily todos; also the root of roadmap_dir (default: "~/todos")
 ---@field roadmap_dir string Subdirectory for roadmap milestones (default: "roadmap")
 ---@field extension string File extension for todo files (default: "todo")
 ---@field date_format string Date format for filename prefix (default: "%Y%m%d")
@@ -18,7 +17,6 @@ end
 ---@type TodoConfig
 M.defaults = {
   directory = "~/todos",
-  daily_dir = "daily",
   roadmap_dir = "roadmap",
   extension = "todo",
   date_format = "%Y%m%d",
@@ -69,16 +67,15 @@ function M.root()
   return vim.fs.normalize(vim.fn.fnamemodify(vim.fn.expand(M.options.directory), ":p"))
 end
 
---- Absolute directory for "daily" or "roadmap" todos.
+--- Absolute directory for "daily" todos (the root) or "roadmap" milestones.
 ---@param kind "daily"|"roadmap"
 ---@return string
 function M.dir(kind)
-  local root = vim.fn.fnamemodify(vim.fn.expand(M.options.directory), ":p")
-  local sub = kind == "roadmap" and M.options.roadmap_dir or M.options.daily_dir
-  if sub and sub ~= "" then
-    root = vim.fs.joinpath(root, sub)
+  local root = M.root()
+  if kind == "roadmap" then
+    return vim.fs.normalize(vim.fs.joinpath(root, M.options.roadmap_dir))
   end
-  return vim.fs.normalize(root)
+  return root
 end
 
 return M

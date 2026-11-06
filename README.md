@@ -37,8 +37,7 @@ Default options:
 ```lua
 require("todo").setup({
   directory = "~/todos",
-  daily_dir = "daily",     -- daily todos: ~/todos/daily/ ("" = ~/todos itself)
-  roadmap_dir = "roadmap", -- milestones:  ~/todos/roadmap/
+  roadmap_dir = "roadmap", -- milestones: ~/todos/roadmap/
   extension = "todo",
   date_format = "%Y%m%d",
   template = {
@@ -76,16 +75,12 @@ require("todo").setup({
 
 Todos are split by folder:
 
-- `~/todos/daily/` - daily tasks (`30m`, `2h`, `1d`)
+- `~/todos/` - daily tasks (`30m`, `2h`, `1d`), as before
 - `~/todos/roadmap/` - mid/long-term milestones (`2w`, `1M`, `3M`)
 
 A daily todo may belong to a milestone through its `[Roadmap]` field, which
 holds the milestone's file name without extension (e.g. `20261106-01`). Leave
 it empty for a one-off task. Completed items go to `done/` inside each folder.
-
-> **Upgrading:** todos used to live directly in `~/todos/`. Move them to
-> `~/todos/daily/`, or set `daily_dir = ""` to keep the old location.
-> `:TodoList` shows a notice while such files remain.
 
 ## Commands
 
@@ -103,7 +98,7 @@ it empty for a one-off task. Completed items go to `done/` inside each folder.
 - `:RoadmapNew` - Create a new milestone in `roadmap/`.
 - `:RoadmapList` / `<leader>Tr` - Roadmap mode. Shows each milestone with its
   Duration, Due date and progress (completed/total linked todos, counting
-  `daily/done/`), followed by its open linked todos. The last line shows how
+  `~/todos/done/`), followed by its open linked todos. The last line shows how
   many todos are not linked to any milestone.
   - `n` - create a daily todo linked to the milestone under the cursor
   - `a` - add a milestone

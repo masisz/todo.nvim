@@ -31,19 +31,6 @@ local function milestone_titles()
   return titles
 end
 
---- Number of todo files left directly in the root directory after daily_dir was introduced.
-local function legacy_count()
-  if (config.options.daily_dir or "") == "" then return 0 end
-  local count, ext = 0, "." .. config.options.extension
-  local root = config.root()
-  if vim.fn.isdirectory(root) == 1 then
-    for name, type in vim.fs.dir(root) do
-      if type == "file" and vim.endswith(name, ext) then count = count + 1 end
-    end
-  end
-  return count
-end
-
 local function build_daily(state)
   local rows = {}
   local titles = milestone_titles()
@@ -53,12 +40,6 @@ local function build_daily(state)
     rows[#rows + 1] = selectable_row(state, todo, todo.label .. duration(todo) .. suffix)
   end
   if #rows == 0 then rows[1] = { text = "No todos" } end
-  local legacy = legacy_count()
-  if legacy > 0 then
-    rows[#rows + 1] = { text = "" }
-    rows[#rows + 1] = { text = string.format("! %d todo(s) in %s are not shown; move them to %s/",
-      legacy, config.root(), config.options.daily_dir) }
-  end
   return rows
 end
 
