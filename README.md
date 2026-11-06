@@ -5,6 +5,7 @@ A lightweight, distraction-free todo management plugin for Neovim.
 ## Features
 
 - Quick todo creation with custom template
+- Roadmap mode: mid/long-term milestones with linked daily todos and progress
 - Automatically sequential todo files (`YYYYMMDD-01.todo`, `YYYYMMDD-02.todo`, ...)
 - Filetype detection and syntax highlighting for todos
 - Configurable todo directory, template, and extension
@@ -16,10 +17,11 @@ A lightweight, distraction-free todo management plugin for Neovim.
 ```lua
 {
   "masisz/todo.nvim",
-  cmd = { "TodoNew", "TodoList" },
+  cmd = { "TodoNew", "TodoList", "RoadmapNew", "RoadmapList" },
   keys = {
     { "<leader>Tn", "<Cmd>TodoNew<CR>", desc = "Create new todo" },
     { "<leader>Tl", "<Cmd>TodoList<CR>", desc = "Open todo list" },
+    { "<leader>Tr", "<Cmd>RoadmapList<CR>", desc = "Open roadmap" },
   },
   opts = {
     directory = "~/todos", -- todo files directory
@@ -35,6 +37,8 @@ Default options:
 ```lua
 require("todo").setup({
   directory = "~/todos",
+  daily_dir = "daily",     -- daily todos: ~/todos/daily/ ("" = ~/todos itself)
+  roadmap_dir = "roadmap", -- milestones:  ~/todos/roadmap/
   extension = "todo",
   date_format = "%Y%m%d",
   template = {
@@ -48,11 +52,40 @@ require("todo").setup({
     end,
     "[Duration]",
     "30m",
+    "[Roadmap]",
+    "", -- id of the linked milestone; empty for a one-off todo
+  },
+  roadmap_template = {
+    "[Title]",
+    "",
+    "[Memo]",
+    "",
+    "[Due]",
+    function()
+      return os.date("%Y-%m-%d")
+    end,
+    "[Duration]",
+    "1M",
   },
   cursor_pos = { 2, 0 },
   start_insert = true,
 })
 ```
+
+## Daily todos and roadmap
+
+Todos are split by folder:
+
+- `~/todos/daily/` - daily tasks (`30m`, `2h`, `1d`)
+- `~/todos/roadmap/` - mid/long-term milestones (`2w`, `1M`, `3M`)
+
+A daily todo may belong to a milestone through its `[Roadmap]` field, which
+holds the milestone's file name without extension (e.g. `20261106-01`). Leave
+it empty for a one-off task. Completed items go to `done/` inside each folder.
+
+> **Upgrading:** todos used to live directly in `~/todos/`. Move them to
+> `~/todos/daily/`, or set `daily_dir = ""` to keep the old location.
+> `:TodoList` shows a notice while such files remain.
 
 ## Commands
 
@@ -66,6 +99,21 @@ require("todo").setup({
   Press `x` to permanently delete selected todos after confirmation. The
   confirmation lists the selected titles and defaults to No. Modified todos
   must be saved before deletion.
+
+- `:RoadmapNew` - Create a new milestone in `roadmap/`.
+- `:RoadmapList` / `<leader>Tr` - Roadmap mode. Shows each milestone with its
+  Duration, Due date and progress (completed/total linked todos, counting
+  `daily/done/`), followed by its open linked todos. The last line shows how
+  many todos are not linked to any milestone.
+  - `n` - create a daily todo linked to the milestone under the cursor
+  - `a` - add a milestone
+  - `o` - edit the milestone or todo under the cursor
+  - Space / Enter / `x` - select / complete / delete milestones
+  - `r` refresh, `q` close
+- In `:TodoList`, each todo shows its Duration and linked milestone
+  (`-> Release v1`). Press `l` to link the selected todos (or the one under
+  the cursor) to a milestone, or choose `(No roadmap)` to unlink. Press `a` to
+  add a todo. Lists refresh when a todo is saved.
 
 `TaskNew` and `TaskList` remain available as compatibility aliases.
 
@@ -81,7 +129,8 @@ with `.ics` files (normally Outlook); the event is marked "Show as: Free" via
 `TRANSP:TRANSPARENT` and `X-MICROSOFT-CDO-BUSYSTATUS:FREE`. Save it in Outlook.
 Generated ICS files are kept under `stdpath("cache")/todo/calendar/`.
 A separate event editor/import opens for each todo with its Title, Memo, and
-Duration filled in. Supported durations are `30m`, `1h`, and `1h30m`; an empty
+Duration filled in. Calendar durations must be in hours/minutes (e.g. `30m`,
+`2h`, `1h30m`); day/week/month durations such as `1d` are rejected. An empty
 Duration defaults to `30m`. Confirm and save in the browser or calendar app. Canceling a prompt
 stops the remaining prompts. Scheduling does not mark todos as done, and
 repeating the operation opens new drafts rather than updating existing events.

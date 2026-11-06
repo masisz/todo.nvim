@@ -20,6 +20,16 @@ vim.api.nvim_create_user_command("TodoNew", function()
   require("todo").create()
 end, { desc = "Create a new todo" })
 
+vim.api.nvim_create_user_command("RoadmapNew", function()
+  require("todo").create_roadmap()
+end, { desc = "Create a new roadmap milestone" })
+
+vim.api.nvim_create_user_command("RoadmapList", function()
+  require("todo").roadmap()
+end, { desc = "Open roadmap milestones with their linked todos" })
+
+vim.keymap.set("n", "<leader>Tr", "<Cmd>RoadmapList<CR>", { desc = "Open roadmap" })
+
 -- Backward compatibility alias
 vim.api.nvim_create_user_command("TaskNew", function()
   require("todo").create()
