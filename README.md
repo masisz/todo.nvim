@@ -132,7 +132,9 @@ Each todo shows its Duration and linked milestone (`-> Release v1`).
 | `a` | Add a todo |
 | `l` | Link selected todos (or the one under the cursor) to a milestone; choose `(No roadmap)` to unlink |
 | `c` | Schedule selected todos in a calendar (see below) |
-| `r` | Refresh |
+| `t` | Switch to the todo list |
+| `r` | Switch to the roadmap |
+| `R` | Refresh |
 | `q` | Close |
 
 ### Keys in `:RoadmapList`
@@ -145,11 +147,18 @@ Each todo shows its Duration and linked milestone (`-> Release v1`).
 | `o` | Edit the milestone or todo under the cursor |
 | `n` | Create a daily todo linked to the milestone under the cursor (or the milestone of the todo under the cursor) |
 | `a` | Add a milestone |
-| `r` | Refresh |
+| `t` | Switch to the todo list |
+| `r` | Switch to the roadmap |
+| `R` | Refresh |
 | `q` | Close |
 
 Notes for both lists:
 
+- Press `t` for the todo list or `r` for the roadmap. Switching reuses the list
+  pane; if the other view is already open, it is focused and the source pane
+  closes. Press `R` (uppercase) to refresh; `r` now switches to the roadmap.
+- Key hints for the current view appear at the bottom of short lists and after
+  the items in long lists (scroll down to see them).
 - `o`, `a` and `n` open the file in the previous window, or in a new split if
   the list is the only window.
 - Save modified files before completing, deleting or linking them. Existing

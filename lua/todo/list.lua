@@ -5,6 +5,7 @@ local M = {}
 
 ---@type table<string, table>
 local states = {}
+local help_ns = vim.api.nvim_create_namespace("todo_list_help")
 
 local function valid(state)
   return state and vim.api.nvim_win_is_valid(state.win) and vim.api.nvim_buf_is_valid(state.buf)
@@ -79,8 +80,23 @@ local function render(state)
   state.rows = state.kind == "roadmap" and build_roadmap(state) or build_daily(state)
   local lines = {}
   for i, row in ipairs(state.rows) do lines[i] = row.text end
+  local help = {
+    "Keys",
+    "t: TODO  r: Roadmap  R: Refresh  q: Close",
+    "Space: Select  Enter: Complete",
+    "o: Edit  a: Add  x: Delete",
+    state.kind == "roadmap" and "n: Add linked TODO" or "l: Link roadmap  c: Calendar",
+  }
+  -- Keep help at the bottom of short lists; long lists can scroll down to it.
+  local help_start = math.max(#lines + 1, vim.api.nvim_win_get_height(state.win) - #help)
+  while #lines < help_start do lines[#lines + 1] = "" end
+  vim.list_extend(lines, help)
   vim.bo[state.buf].modifiable = true
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
+  vim.api.nvim_buf_clear_namespace(state.buf, help_ns, 0, -1)
+  for i = help_start, #lines - 1 do
+    vim.api.nvim_buf_add_highlight(state.buf, help_ns, "Comment", i, 0, -1)
+  end
   vim.bo[state.buf].modifiable = false
 end
 
@@ -262,15 +278,23 @@ local function link(state)
 end
 
 ---@param kind? "daily"|"roadmap"
-function M.open(kind)
+function M.open(kind, reuse_win)
   kind = kind == "roadmap" and "roadmap" or "daily"
   local existing = states[kind]
   if valid(existing) then
     vim.api.nvim_set_current_win(existing.win)
     refresh(existing)
+    if reuse_win and reuse_win ~= existing.win then
+      vim.api.nvim_win_close(reuse_win, false)
+    end
     return
   end
-  vim.cmd("botright vnew")
+  if reuse_win then
+    vim.api.nvim_set_current_win(reuse_win)
+    vim.api.nvim_win_set_buf(reuse_win, vim.api.nvim_create_buf(false, true))
+  else
+    vim.cmd("botright vnew")
+  end
   local win = vim.api.nvim_get_current_win()
   local buf = vim.api.nvim_get_current_buf()
   local state = {
@@ -299,7 +323,9 @@ function M.open(kind)
   map("<CR>", complete, "Complete selected items")
   map("x", delete_selected, "Delete selected items with confirmation")
   map("o", edit_item, "Edit item under cursor")
-  map("r", refresh_all, "Refresh")
+  map("t", function() M.open("daily", state.win) end, "Switch to todo list")
+  map("r", function() M.open("roadmap", state.win) end, "Switch to roadmap")
+  map("R", refresh_all, "Refresh")
   vim.keymap.set("n", "q", "<Cmd>close<CR>", { buffer = buf, desc = "Close list" })
   if kind == "roadmap" then
     map("a", function() create(state, { kind = "roadmap" }) end, "Add a milestone")
@@ -312,6 +338,12 @@ function M.open(kind)
   end
 
   local group = vim.api.nvim_create_augroup("todo_list_" .. kind, { clear = true })
+  vim.api.nvim_create_autocmd("VimResized", {
+    group = group,
+    callback = function()
+      if valid(state) then render(state) end
+    end,
+  })
   vim.api.nvim_create_autocmd("BufWritePost", {
     group = group,
     pattern = "*." .. config.options.extension,
