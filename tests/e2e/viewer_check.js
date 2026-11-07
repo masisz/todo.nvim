@@ -23,7 +23,7 @@ function fixture() {
   fs.mkdirSync(path.join(roadmap, "done"), { recursive: true });
   const write = (rel, title, due, duration) =>
     fs.writeFileSync(path.join(roadmap, rel), `[Title]\r\n${title}\r\n[Memo]\r\n\r\n[Due]\r\n${due}\r\n[Duration]\r\n${duration}\r\n`);
-  write("done/20261001-01.todo", "調査 <research>", "2026-10-31", "2w");
+  write("done/20261001-01.todo", '調査 <research> <img src=x onerror="window.injected=1">', "2026-10-31", "2w");
   write("20261101-01.todo", "設計 \"v1\": UI #1", "2026-11-30", "1M");
   write("20261101-02.todo", "実装", "2026-12-31", "1M");
   write("20261101-03.todo", "ドキュメント", "2026-12-10", "2w");
@@ -85,6 +85,10 @@ function pngSize(buf) {
     });
     await check("titles are escaped", async () => {
       assert.ok((await page.locator("#graph").textContent()).includes("<research>"));
+      await page.locator('#graph .n[data-id="20261001-01"]').click();
+      assert.ok((await page.locator("#detail").textContent()).includes("<img"));
+      assert.strictEqual(await page.locator("#detail img, #graph img").count(), 0);
+      assert.strictEqual(await page.evaluate(() => window.injected), undefined);
     });
     await check("click selects in both views and shows predecessors/successors", async () => {
       await page.locator('#graph .n[data-id="20261101-01"]').click();

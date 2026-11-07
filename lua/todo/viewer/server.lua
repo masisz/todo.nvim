@@ -10,6 +10,9 @@ local fsutil = require("todo.viewer.fsutil")
 local M = {}
 
 M.MAX_BODY = 32 * 1024 * 1024
+M.MAX_CLIENTS = 16
+M.REQUEST_TIMEOUT = 10000
+local clients = {}
 
 --- Files the viewer may write into the export directory.
 M.EXPORTS = {
@@ -37,13 +40,8 @@ local STATUS = {
 
 local function random_token()
   local ok, bytes = pcall(uv.random, 16)
-  if not ok or type(bytes) ~= "string" then
-    math.randomseed(uv.hrtime())
-    local t = {}
-    for i = 1, 16 do
-      t[i] = string.char(math.random(0, 255))
-    end
-    bytes = table.concat(t)
+  if not ok or type(bytes) ~= "string" or #bytes ~= 16 then
+    return nil, "secure random token generation failed"
   end
   return (bytes:gsub(".", function(c) return ("%02x"):format(c:byte()) end))
 end
@@ -64,7 +62,7 @@ end
 --- Parse a complete HTTP request out of buffered data.
 ---@param data string
 ---@return table|nil request, string|nil err  nil, nil means "need more data"
-function M.parse_request(data)
+function M.parse_request(data, headers_only)
   local head_end = data:find("\r\n\r\n", 1, true)
   if not head_end then
     if #data > 64 * 1024 then
@@ -72,6 +70,7 @@ function M.parse_request(data)
     end
     return nil
   end
+  if head_end > 64 * 1024 then return nil, "headers too large" end
   local head = data:sub(1, head_end - 1)
   local method, target = head:match("^(%u+) (%S+) HTTP/1%.[01]")
   if not method then
@@ -81,15 +80,17 @@ function M.parse_request(data)
   for name, value in head:gmatch("\r\n([^:\r\n]+):%s*([^\r\n]*)") do
     headers[name:lower()] = value
   end
-  local length = tonumber(headers["content-length"] or "0")
-  if not length or length < 0 then
+  local raw_length = headers["content-length"] or "0"
+  local length = tonumber(raw_length)
+  if not raw_length:match("^%d+$") or not length or length < 0 then
     return nil, "bad content-length"
   end
+  if headers["transfer-encoding"] then return nil, "unsupported transfer-encoding" end
   if length > M.MAX_BODY then
     return nil, "too large"
   end
   local body_start = head_end + 4
-  if #data < body_start + length - 1 then
+  if not headers_only and #data < body_start + length - 1 then
     return nil
   end
   local path, query = target:match("^([^?]*)%??(.*)$")
@@ -110,6 +111,8 @@ local function response(status, body, content_type, extra)
     "Content-Length: " .. #body,
     "Cache-Control: no-store",
     "X-Content-Type-Options: nosniff",
+    "X-Frame-Options: DENY",
+    "Referrer-Policy: no-referrer",
     "Connection: close",
   }
   for _, h in ipairs(extra or {}) do
@@ -173,7 +176,7 @@ function M.handle(req, token, port)
     if not html then
       return err(500, "assets/roadmap.html not found")
     end
-    return response(200, html, "text/html; charset=utf-8", { "Content-Security-Policy: default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:" })
+    return response(200, html, "text/html; charset=utf-8", { "Content-Security-Policy: default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; form-action 'none'" })
   end
 
   if req.path:sub(1, 5) ~= "/api/" then
@@ -241,15 +244,24 @@ end
 
 local function on_connection(server, token, port)
   local client = uv.new_tcp()
-  server:accept(client)
+  if not server:accept(client) then client:close(); return end
+  local count = 0
+  for _ in pairs(clients) do count = count + 1 end
+  if count >= M.MAX_CLIENTS then client:close(); return end
+  local timer = uv.new_timer()
+  clients[client] = timer
+  local function close()
+    clients[client] = nil
+    if not timer:is_closing() then timer:stop(); timer:close() end
+    if not client:is_closing() then client:close() end
+  end
+  timer:start(M.REQUEST_TIMEOUT, 0, close)
   local chunks, size, handled = {}, 0, false
   local function finish(raw)
     handled = true
     client:read_stop()
     client:write(raw, function()
-      if not client:is_closing() then
-        client:close()
-      end
+      close()
     end)
   end
   client:read_start(function(read_err, chunk)
@@ -257,9 +269,7 @@ local function on_connection(server, token, port)
       return
     end
     if read_err or not chunk then
-      if not client:is_closing() then
-        client:close()
-      end
+      close()
       return
     end
     chunks[#chunks + 1] = chunk
@@ -269,6 +279,21 @@ local function on_connection(server, token, port)
     end
     local data = table.concat(chunks)
     chunks = { data }
+    -- Authenticate as soon as headers arrive, before buffering the request body.
+    local head, head_err = M.parse_request(data, true)
+    if head_err then return finish(err(head_err == "too large" and 413 or 400, head_err)) end
+    if head then
+      local host = head.headers.host
+      if host ~= "127.0.0.1:" .. port and host ~= "localhost:" .. port then
+        return finish(err(403, "bad host"))
+      end
+      if head.path:sub(1, 5) == "/api/" and head.headers["x-token"] ~= token then
+        return finish(err(403, "bad token"))
+      end
+      if head.path:sub(1, 5) ~= "/api/" and #head.body > 0 then
+        return finish(err(400, "unexpected request body"))
+      end
+    end
     local req, parse_err = M.parse_request(data)
     if parse_err then
       return finish(err(parse_err == "too large" and 413 or 400, parse_err))
@@ -278,14 +303,13 @@ local function on_connection(server, token, port)
       client:read_stop()
       -- libuv callbacks run in a fast event context where most of vim.api/vim.fn is unavailable.
       vim.schedule(function()
+        if client:is_closing() then return end
         local ok, raw = pcall(M.handle, req, token, port)
         if not ok then
           raw = err(500, tostring(raw))
         end
         client:write(raw, function()
-          if not client:is_closing() then
-            client:close()
-          end
+          close()
         end)
       end)
     end
@@ -305,7 +329,8 @@ function M.start()
     return nil, bind_err
   end
   local port = tcp:getsockname().port
-  local token = random_token()
+  local token, token_err = random_token()
+  if not token then tcp:close(); return nil, token_err end
   local listening, listen_err = tcp:listen(16, function(listen_cb_err)
     if not listen_cb_err then
       on_connection(tcp, token, port)
@@ -333,6 +358,11 @@ function M.url()
 end
 
 function M.stop()
+  for client, timer in pairs(clients) do
+    if not timer:is_closing() then timer:stop(); timer:close() end
+    if not client:is_closing() then client:close() end
+    clients[client] = nil
+  end
   if M.state then
     if not M.state.tcp:is_closing() then
       M.state.tcp:close()
