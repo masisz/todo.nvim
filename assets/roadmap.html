@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap Viewer</title>
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --fg: #1f2328; --muted: #6b7280; --line: #d0d4da;
+  --node: #ffffff; --node-stroke: #8c95a1; --accent: #2563eb; --crit: #d33a2c; --warn: #b45309;
+  --done-fill: #ececec; --done-fg: #8a8a8a; --bar: #93b4f5; --bar-stroke: #4f7fe0; --grid: #eceef1;
+  --select: #f59e0b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16181c; --panel: #1f2227; --fg: #e6e8eb; --muted: #9aa3ad; --line: #3a3f46;
+    --node: #262a30; --node-stroke: #6b7480; --accent: #6ea0ff; --crit: #ff6b5e; --warn: #f0a33a;
+    --done-fill: #2c2f34; --done-fg: #7d848c; --bar: #3d5f9e; --bar-stroke: #6e9cf0; --grid: #2a2e34;
+    --select: #fbbf24;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--fg);
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", sans-serif;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+}
+header {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+header h1 { font-size: 15px; margin: 0 8px 0 0; }
+button, select, input {
+  font: inherit; color: var(--fg); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px;
+}
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.group { display: inline-flex; gap: 4px; }
+.spacer { flex: 1; }
+#status { color: var(--muted); font-size: 12px; min-width: 8em; }
+#status.error { color: var(--crit); }
+main {
+  display: grid; grid-template-columns: 1fr 300px; min-height: 0;
+}
+#views { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; min-width: 0; }
+#views[data-layout="graph"] { grid-template-rows: 1fr 0; }
+#views[data-layout="gantt"] { grid-template-rows: 0 1fr; }
+#views[data-layout="graph"] #gantt-pane, #views[data-layout="gantt"] #graph-pane { display: none; }
+.pane { overflow: auto; min-height: 0; border-bottom: 1px solid var(--line); position: relative; outline: none; }
+.pane:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.pane-title { position: sticky; left: 0; top: 0; z-index: 1; display: inline-block; padding: 4px 16px; font-size: 12px; color: var(--muted); background: var(--bg); }
+aside { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 12px 16px; }
+aside h2 { font-size: 13px; margin: 12px 0 6px; color: var(--muted); }
+aside h2:first-child { margin-top: 0; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; word-break: break-all; }
+ul.links, ul.warnings { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+ul.links li a, ul.warnings li { cursor: pointer; }
+ul.links li a { color: var(--accent); text-decoration: none; }
+ul.warnings li { padding: 4px 0; border-bottom: 1px dashed var(--line); color: var(--warn); }
+.empty { color: var(--muted); font-size: 13px; }
+#search { width: 14em; }
+#help { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; align-items: center; justify-content: center; }
+#help[open], #help.open { display: flex; }
+#help .box { background: var(--panel); border-radius: 10px; padding: 16px 20px; max-width: 520px; }
+#help table { border-collapse: collapse; font-size: 13px; }
+#help td { padding: 3px 10px 3px 0; vertical-align: top; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 12px; }
+#banner { display: none; background: var(--crit); color: #fff; padding: 6px 16px; font-size: 13px; }
+#banner.show { display: block; }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  aside { border-left: 0; border-top: 1px solid var(--line); max-height: 35vh; }
+  #search { width: 9em; }
+}
+/* Diagram classes. Exported files embed their own light copy of these (see EXPORT_STYLE). */
+svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", sans-serif; }
+.n rect { fill: var(--node); stroke: var(--node-stroke); stroke-width: 1.2; }
+.n text { fill: var(--fg); font-size: 13px; }
+.n text.sub { fill: var(--muted); font-size: 11px; }
+.n.done rect { fill: var(--done-fill); stroke-dasharray: 4 3; }
+.n.done text { fill: var(--done-fg); }
+.n.crit rect { stroke: var(--crit); stroke-width: 2; }
+.n.sel rect, .bar.sel { stroke: var(--select) !important; stroke-width: 3 !important; }
+.n, .bar, .row-label { cursor: pointer; }
+.e { fill: none; stroke: var(--node-stroke); stroke-width: 1.4; }
+.e.crit { stroke: var(--crit); stroke-width: 2; }
+.e.bad { stroke: var(--crit); stroke-dasharray: 5 4; }
+.e.hl { stroke: var(--select); stroke-width: 2.4; }
+.arrow { fill: var(--node-stroke); }
+.arrow.crit, .arrow.bad { fill: var(--crit); }
+.grid { stroke: var(--grid); stroke-width: 1; }
+.axis { fill: var(--muted); font-size: 11px; }
+.today { stroke: var(--accent); stroke-dasharray: 3 3; }
+.row-label { fill: var(--fg); font-size: 12px; }
+.row-label.done { fill: var(--done-fg); }
+.row-bg.sel { fill: var(--select); opacity: .15; }
+.bar { fill: var(--bar); stroke: var(--bar-stroke); stroke-width: 1; }
+.bar.done { fill: var(--done-fill); stroke: var(--node-stroke); }
+.bar.crit { stroke: var(--crit); stroke-width: 2; }
+.bg { fill: var(--bg); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Roadmap</h1>
+  <div class="group" role="group" aria-label="表示">
+    <button data-layout="split" aria-pressed="true" title="分割 (1)">分割</button>
+    <button data-layout="graph" aria-pressed="false" title="依存グラフ (2)">グラフ</button>
+    <button data-layout="gantt" aria-pressed="false" title="ガント (3)">ガント</button>
+  </div>
+  <input id="search" type="search" placeholder="検索 (/)" aria-label="マイルストーン検索" list="titles">
+  <datalist id="titles"></datalist>
+  <div class="group">
+    <button id="zoom-out" title="縮小 (-)">−</button>
+    <button id="zoom-in" title="拡大 (+)">＋</button>
+  </div>
+  <span class="spacer"></span>
+  <span id="status" role="status"></span>
+  <select id="export" aria-label="書き出し">
+    <option value="">書き出し…</option>
+    <option value="roadmap.png">両方 PNG</option>
+    <option value="roadmap.svg">両方 SVG</option>
+    <option value="graph.png">グラフ PNG</option>
+    <option value="graph.svg">グラフ SVG</option>
+    <option value="gantt.png">ガント PNG</option>
+    <option value="gantt.svg">ガント SVG</option>
+    <option value="mermaid">Mermaid (roadmap.md)</option>
+  </select>
+  <button id="reload" title="再読み込み (R)">再読み込み</button>
+  <button id="help-btn" title="キー操作 (?)">?</button>
+</header>
+<div id="banner" role="alert">Neovim に接続できません。<code>:RoadmapView</code> を実行し直してください。</div>
+<main>
+  <div id="views" data-layout="split">
+    <section id="graph-pane" class="pane" tabindex="0" aria-label="依存グラフ">
+      <span class="pane-title">依存グラフ</span>
+      <div id="graph"></div>
+    </section>
+    <section id="gantt-pane" class="pane" tabindex="0" aria-label="ガント">
+      <span class="pane-title">ガント</span>
+      <div id="gantt"></div>
+    </section>
+  </div>
+  <aside>
+    <h2>選択中</h2>
+    <div id="detail"><p class="empty">マイルストーンをクリックするか、矢印キーで選択</p></div>
+    <h2 id="warn-title">警告</h2>
+    <ul id="warnings" class="warnings"></ul>
+  </aside>
+</main>
+<div id="help" role="dialog" aria-modal="true" aria-label="キー操作">
+  <div class="box">
+    <table>
+      <tr><td><kbd>↑</kbd><kbd>↓</kbd> / <kbd>j</kbd><kbd>k</kbd></td><td>前後のマイルストーン（依存順）</td></tr>
+      <tr><td><kbd>←</kbd> / <kbd>h</kbd></td><td>前パスへ移動</td></tr>
+      <tr><td><kbd>→</kbd> / <kbd>l</kbd></td><td>後パスへ移動</td></tr>
+      <tr><td><kbd>/</kbd></td><td>検索（Enter で選択）</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>選択解除・閉じる</td></tr>
+      <tr><td><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></td><td>分割 / グラフ / ガント</td></tr>
+      <tr><td><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></td><td>拡大 / 縮小 / 等倍（Ctrl/⌘+ホイールでも可）</td></tr>
+      <tr><td><kbd>e</kbd></td><td>両方を PNG で書き出し</td></tr>
+      <tr><td><kbd>m</kbd></td><td>Mermaid を書き出し</td></tr>
+      <tr><td><kbd>R</kbd></td><td>再読み込み</td></tr>
+    </table>
+    <p class="empty">書き出し先: roadmap/export/</p>
+  </div>
+</div>
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.hash.slice(1)).get("token") || "";
+const FONT = '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans CJK JP", sans-serif';
+// Light palette baked into exported files, independent of the page theme.
+const EXPORT_STYLE = `
+text { font-family: ${FONT}; }
+.bg { fill: #ffffff; }
+.n rect { fill: #ffffff; stroke: #8c95a1; stroke-width: 1.2; }
+.n text { fill: #1f2328; font-size: 13px; } .n text.sub { fill: #6b7280; font-size: 11px; }
+.n.done rect { fill: #ececec; stroke-dasharray: 4 3; } .n.done text { fill: #8a8a8a; }
+.n.crit rect { stroke: #d33a2c; stroke-width: 2; }
+.e { fill: none; stroke: #8c95a1; stroke-width: 1.4; } .e.crit { stroke: #d33a2c; stroke-width: 2; }
+.e.bad { stroke: #d33a2c; stroke-dasharray: 5 4; }
+.arrow { fill: #8c95a1; } .arrow.crit, .arrow.bad { fill: #d33a2c; }
+.grid { stroke: #eceef1; stroke-width: 1; } .axis { fill: #6b7280; font-size: 11px; }
+.today { stroke: #2563eb; stroke-dasharray: 3 3; }
+.row-label { fill: #1f2328; font-size: 12px; } .row-label.done { fill: #8a8a8a; }
+.bar { fill: #93b4f5; stroke: #4f7fe0; stroke-width: 1; } .bar.done { fill: #ececec; stroke: #8c95a1; }
+.bar.crit { stroke: #d33a2c; stroke-width: 2; }`;
+
+const G = { W: 184, H: 50, GX: 64, GY: 18, PAD: 24 };
+const T = { LABEL: 210, ROW: 28, HEAD: 44, PAD: 16 };
+const DAY = 86400000;
+
+const state = { model: null, byId: new Map(), preds: new Map(), succs: new Map(), selected: null, zoom: 1, version: null, offline: false };
+const $ = (id) => document.getElementById(id);
+const arr = (x) => (Array.isArray(x) ? x : []); // vim.json encodes empty lists as {}
+
+// ---------------------------------------------------------------- API
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: { "X-Token": TOKEN }, body });
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { error: text }; }
+  if (!res.ok) throw new Error(data.error || res.status + " " + res.statusText);
+  return data;
+}
+
+function setStatus(text, isError) {
+  const el = $("status");
+  el.textContent = text;
+  el.className = isError ? "error" : "";
+}
+
+async function load() {
+  try {
+    const model = await api("GET", "/api/roadmap");
+    model.nodes = arr(model.nodes); model.edges = arr(model.edges);
+    model.order = arr(model.order); model.warnings = arr(model.warnings);
+    model.warnings.forEach((w) => { w.ids = arr(w.ids); });
+    state.model = model;
+    state.version = model.version;
+    state.byId = new Map(model.nodes.map((n) => [n.id, n]));
+    state.preds = new Map(model.nodes.map((n) => [n.id, []]));
+    state.succs = new Map(model.nodes.map((n) => [n.id, []]));
+    for (const e of model.edges) { state.preds.get(e.to).push(e.from); state.succs.get(e.from).push(e.to); }
+    if (state.selected && !state.byId.has(state.selected)) state.selected = null;
+    $("titles").innerHTML = model.nodes.map((n) => `<option value="${esc(n.title)}">`).join("");
+    render();
+    setStatus(`${model.nodes.length} 件 · ${model.edges.length} 依存`);
+  } catch (err) {
+    setStatus("読み込み失敗: " + err.message, true);
+  }
+}
+
+async function poll() {
+  try {
+    const { version } = await api("GET", "/api/version");
+    if (state.offline) { state.offline = false; $("banner").classList.remove("show"); }
+    if (version !== state.version) await load();
+  } catch (_) {
+    state.offline = true;
+    $("banner").classList.add("show");
+  }
+}
+
+// ---------------------------------------------------------------- helpers
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+const measureCtx = document.createElement("canvas").getContext("2d");
+function fit(text, px, max) {
+  measureCtx.font = `${px}px ${FONT}`;
+  if (measureCtx.measureText(text).width <= max) return text;
+  let s = text;
+  while (s.length > 1 && measureCtx.measureText(s + "…").width > max) s = s.slice(0, -1);
+  return s + "…";
+}
+const toDay = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / DAY;
+const fromDay = (n) => new Date(n * DAY).toISOString().slice(0, 10);
+function nodeClass(n) {
+  return [n.done ? "done" : "", n.critical && !n.done ? "crit" : "", n.id === state.selected ? "sel" : ""].join(" ");
+}
+function svgOpen(w, h, forExport) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"` +
+    (forExport ? "" : ` style="width:${w * state.zoom}px;height:${h * state.zoom}px"`) + ">";
+}
+function defs(prefix) {
+  return `<defs>${["", "crit", "bad"].map((k) =>
+    `<marker id="${prefix}-a${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow ${k}" d="M0,0 L10,5 L0,10 z"/></marker>`).join("")}</defs>`;
+}
+const edgeKind = (e) => (e.violated ? "bad" : e.critical ? "crit" : "");
+
+// ---------------------------------------------------------------- graph layout
+// Layered DAG layout: rank = longest path from a source, then barycenter sweeps to reduce crossings.
+function layoutGraph(model) {
+  const rank = new Map();
+  for (const id of model.order) {
+    let r = 0;
+    for (const p of state.preds.get(id) || []) if (rank.has(p)) r = Math.max(r, rank.get(p) + 1);
+    rank.set(id, r);
+  }
+  const layers = [];
+  model.order.forEach((id) => { const r = rank.get(id); (layers[r] = layers[r] || []).push(id); });
+  const pos = new Map();
+  const index = () => layers.forEach((l) => l.forEach((id, i) => pos.set(id, i)));
+  index();
+  const bary = (id, nbrs) => {
+    const xs = nbrs.filter((n) => pos.has(n)).map((n) => pos.get(n));
+    return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : pos.get(id);
+  };
+  for (let iter = 0; iter < 4; iter++) {
+    for (let r = 1; r < layers.length; r++) {
+      const keys = new Map(layers[r].map((id) => [id, bary(id, state.preds.get(id))]));
+      layers[r].sort((a, b) => keys.get(a) - keys.get(b)); index();
+    }
+    for (let r = layers.length - 2; r >= 0; r--) {
+      const keys = new Map(layers[r].map((id) => [id, bary(id, state.succs.get(id))]));
+      layers[r].sort((a, b) => keys.get(a) - keys.get(b)); index();
+    }
+  }
+  const tallest = Math.max(1, ...layers.map((l) => l.length));
+  const xy = new Map();
+  layers.forEach((l, r) => {
+    const offset = ((tallest - l.length) * (G.H + G.GY)) / 2;
+    l.forEach((id, i) => xy.set(id, { x: G.PAD + r * (G.W + G.GX), y: G.PAD + 20 + offset + i * (G.H + G.GY) }));
+  });
+  return {
+    xy,
+    width: G.PAD * 2 + Math.max(1, layers.length) * (G.W + G.GX) - G.GX,
+    height: G.PAD * 2 + 20 + tallest * (G.H + G.GY) - G.GY,
+  };
+}
+
+function graphSvg(forExport) {
+  const model = state.model;
+  if (!model.nodes.length) return null;
+  const { xy, width, height } = layoutGraph(model);
+  const sel = forExport ? null : state.selected;
+  const out = [svgOpen(width, height, forExport)];
+  if (forExport) out.push(`<style>${EXPORT_STYLE}</style><rect class="bg" width="100%" height="100%"/>`);
+  out.push(defs("g"));
+  for (const e of model.edges) {
+    const a = xy.get(e.from), b = xy.get(e.to);
+    const x1 = a.x + G.W, y1 = a.y + G.H / 2, x2 = b.x, y2 = b.y + G.H / 2;
+    const dx = Math.max(30, Math.abs(x2 - x1) / 2);
+    const hl = sel && (e.from === sel || e.to === sel) ? " hl" : "";
+    out.push(`<path class="e ${edgeKind(e)}${hl}" marker-end="url(#g-a${edgeKind(e)})" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2 - 1},${y2}"/>`);
+  }
+  for (const n of model.nodes) {
+    const { x, y } = xy.get(n.id);
+    const sub = n.due ? `${n.start === n.finish ? "" : n.start + " → "}${n.due}` : "日付未設定";
+    out.push(`<g class="n ${forExport ? nodeClass({ ...n, id: "" }) : nodeClass(n)}" data-id="${esc(n.id)}" transform="translate(${x},${y})">` +
+      `<rect width="${G.W}" height="${G.H}" rx="8"/>` +
+      `<text x="10" y="21">${esc(fit(n.title, 13, G.W - 20))}</text>` +
+      `<text class="sub" x="10" y="39">${esc(fit(sub + "  " + n.duration, 11, G.W - 20))}</text></g>`);
+  }
+  out.push("</svg>");
+  return { svg: out.join(""), width, height };
+}
+
+// ---------------------------------------------------------------- gantt
+function ganttSvg(forExport) {
+  const model = state.model;
+  const rows = model.order.map((id) => state.byId.get(id)).filter((n) => n && n.start && n.finish);
+  const undated = model.nodes.filter((n) => !n.start || !n.finish);
+  if (!rows.length && !undated.length) return null;
+  let d0 = Math.min(...rows.map((n) => toDay(n.start))), d1 = Math.max(...rows.map((n) => toDay(n.finish)));
+  if (!rows.length) { d0 = Math.floor(Date.now() / DAY); d1 = d0 + 30; }
+  d0 -= 3; d1 += 7;
+  const pane = $("gantt-pane");
+  const avail = Math.max(400, (forExport ? 1200 : pane.clientWidth / state.zoom) - T.LABEL - T.PAD * 2);
+  const dayW = Math.min(40, Math.max(3, avail / (d1 - d0)));
+  const X = (d) => T.LABEL + T.PAD + (d - d0) * dayW;
+  const total = rows.length + (undated.length ? undated.length + 1 : 0);
+  const width = Math.ceil(X(d1) + T.PAD), height = T.HEAD + total * T.ROW + T.PAD;
+  const rowY = new Map(rows.map((n, i) => [n.id, T.HEAD + i * T.ROW]));
+  const sel = forExport ? null : state.selected;
+  const out = [svgOpen(width, height, forExport)];
+  if (forExport) out.push(`<style>${EXPORT_STYLE}</style><rect class="bg" width="100%" height="100%"/>`);
+  out.push(defs("t"));
+  // month grid + labels, week lines when there is room
+  const start = new Date(d0 * DAY);
+  for (let m = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1)); m.getTime() / DAY <= d1; m.setUTCMonth(m.getUTCMonth() + 1)) {
+    const d = m.getTime() / DAY;
+    if (d >= d0) {
+      out.push(`<line class="grid" x1="${X(d)}" y1="${T.HEAD - 22}" x2="${X(d)}" y2="${height - T.PAD}"/>`);
+      out.push(`<text class="axis" x="${X(d) + 4}" y="${T.HEAD - 26}">${m.getUTCFullYear()}-${String(m.getUTCMonth() + 1).padStart(2, "0")}</text>`);
+    }
+  }
+  if (dayW * 7 >= 24) {
+    for (let d = d0; d <= d1; d++) {
+      if (new Date(d * DAY).getUTCDay() === 1) {
+        out.push(`<line class="grid" x1="${X(d)}" y1="${T.HEAD - 8}" x2="${X(d)}" y2="${height - T.PAD}" opacity=".6"/>`);
+        if (dayW * 7 >= 40) out.push(`<text class="axis" x="${X(d) + 2}" y="${T.HEAD - 10}">${fromDay(d).slice(8)}</text>`);
+      }
+    }
+  }
+  const today = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / DAY);
+  if (today >= d0 && today <= d1) out.push(`<line class="today" x1="${X(today)}" y1="${T.HEAD - 22}" x2="${X(today)}" y2="${height - T.PAD}"/>`);
+  rows.forEach((n) => {
+    const y = rowY.get(n.id);
+    if (n.id === sel) out.push(`<rect class="row-bg sel" x="0" y="${y}" width="${width}" height="${T.ROW}"/>`);
+    out.push(`<text class="row-label ${n.done ? "done" : ""}" data-id="${esc(n.id)}" x="${T.PAD}" y="${y + 18}">${esc(fit(n.title, 12, T.LABEL - T.PAD))}</text>`);
+  });
+  for (const e of model.edges) {
+    if (!rowY.has(e.from) || !rowY.has(e.to)) continue;
+    const a = state.byId.get(e.from), b = state.byId.get(e.to);
+    const xa = X(toDay(a.finish)), ya = rowY.get(e.from) + T.ROW / 2;
+    const xb = X(toDay(b.start)), yb = rowY.get(e.to) + T.ROW / 2;
+    const hl = sel && (e.from === sel || e.to === sel) ? " hl" : "";
+    out.push(`<path class="e ${edgeKind(e)}${hl}" marker-end="url(#t-a${edgeKind(e)})" d="M${xa},${ya} H${xa + 8} V${yb} H${xb - 1}"/>`);
+  }
+  rows.forEach((n) => {
+    const y = rowY.get(n.id) + 6, h = T.ROW - 12;
+    const cls = `bar ${n.done ? "done" : ""} ${n.critical && !n.done ? "crit" : ""} ${n.id === sel ? "sel" : ""}`;
+    const xs = X(toDay(n.start)), xf = X(toDay(n.finish));
+    if (xf - xs < 2) {
+      const cx = xf, cy = y + h / 2, r = h / 2 + 1;
+      out.push(`<path class="${cls}" data-id="${esc(n.id)}" d="M${cx},${cy - r} L${cx + r},${cy} L${cx},${cy + r} L${cx - r},${cy} z"/>`);
+    } else {
+      out.push(`<rect class="${cls}" data-id="${esc(n.id)}" x="${xs}" y="${y}" width="${xf - xs}" height="${h}" rx="3"/>`);
+    }
+  });
+  if (undated.length) {
+    let y = T.HEAD + rows.length * T.ROW;
+    out.push(`<text class="axis" x="${T.PAD}" y="${y + 18}">日付未設定</text>`);
+    undated.forEach((n) => {
+      y += T.ROW;
+      out.push(`<text class="row-label ${n.done ? "done" : ""}" data-id="${esc(n.id)}" x="${T.PAD}" y="${y + 18}">${esc(fit(n.title, 12, T.LABEL - T.PAD))}</text>`);
+    });
+  }
+  out.push("</svg>");
+  return { svg: out.join(""), width, height };
+}
+
+// ---------------------------------------------------------------- render
+function render() {
+  if (!state.model) return;
+  const g = graphSvg(false), t = ganttSvg(false);
+  $("graph").innerHTML = g ? g.svg : '<p class="empty" style="padding:0 16px">roadmap/ にマイルストーンがありません</p>';
+  $("gantt").innerHTML = t ? t.svg : "";
+  renderSide();
+}
+
+function renderSide() {
+  const n = state.selected && state.byId.get(state.selected);
+  const link = (id) => {
+    const m = state.byId.get(id);
+    return `<li><a data-id="${esc(id)}">${esc(m ? m.title : id)}</a></li>`;
+  };
+  if (!n) {
+    $("detail").innerHTML = '<p class="empty">マイルストーンをクリックするか、矢印キーで選択</p>';
+  } else {
+    const preds = state.preds.get(n.id), succs = state.succs.get(n.id);
+    $("detail").innerHTML =
+      `<dl><dt>タイトル</dt><dd>${esc(n.title)}</dd><dt>ID</dt><dd>${esc(n.id)}</dd>` +
+      `<dt>期間</dt><dd>${n.due ? esc(n.start) + " → " + esc(n.due) : "日付未設定"}</dd>` +
+      `<dt>Duration</dt><dd>${esc(n.duration || "-")}</dd>` +
+      `<dt>状態</dt><dd>${n.done ? "完了" : n.critical ? "未完了・クリティカルパス" : "未完了"}</dd>` +
+      `<dt>ファイル</dt><dd>${esc(n.path)}</dd></dl>` +
+      `<h2>前パス</h2>${preds.length ? `<ul class="links">${preds.map(link).join("")}</ul>` : '<p class="empty">なし</p>'}` +
+      `<h2>後パス</h2>${succs.length ? `<ul class="links">${succs.map(link).join("")}</ul>` : '<p class="empty">なし</p>'}`;
+  }
+  const ws = state.model.warnings;
+  $("warn-title").textContent = `警告 (${ws.length})`;
+  $("warnings").innerHTML = ws.length
+    ? ws.map((w, i) => `<li data-warning="${i}">${esc(w.message)}</li>`).join("")
+    : '<li class="empty" style="color:var(--muted)">なし</li>';
+}
+
+function select(id, scroll) {
+  state.selected = id;
+  render();
+  if (id && scroll !== false) {
+    for (const el of document.querySelectorAll(`[data-id="${CSS.escape(id)}"]`)) {
+      if (el.closest("aside")) continue;
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }
+}
+
+// ---------------------------------------------------------------- export
+function combinedSvg() {
+  const g = graphSvg(true), t = ganttSvg(true);
+  const parts = [g, t].filter(Boolean);
+  if (!parts.length) return null;
+  const strip = (s) => s.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "").replace(/<style>[\s\S]*?<\/style>/, "");
+  const width = Math.max(...parts.map((p) => p.width));
+  let y = 0, body = "";
+  for (const p of parts) { body += `<g transform="translate(0,${y})">${strip(p.svg)}</g>`; y += p.height + 16; }
+  const height = y - 16;
+  return { svg: `${svgOpen(width, height, true)}<style>${EXPORT_STYLE}</style><rect class="bg" width="100%" height="100%"/>${body}</svg>`, width, height };
+}
+
+function exportSvg(kind) {
+  return kind === "graph" ? graphSvg(true) : kind === "gantt" ? ganttSvg(true) : combinedSvg();
+}
+
+// Rasterize a pure SVG (no foreignObject, so the canvas is never tainted; Safari needs explicit width/height).
+function svgToPng(svg, width, height, scale) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.ceil(width * scale); canvas.height = Math.ceil(height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("toBlob returned null"))), "image/png");
+      } catch (err) { reject(err); }
+    };
+    img.onerror = () => reject(new Error("SVG image failed to load"));
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  });
+}
+
+function download(name, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function exportFile(name) {
+  if (!state.model) return;
+  try {
+    if (name === "mermaid") {
+      const { path } = await api("POST", "/api/export/mermaid");
+      return setStatus("保存: " + path);
+    }
+    const [kind, ext] = name.split(".");
+    const out = exportSvg(kind);
+    if (!out) return setStatus("書き出す内容がありません", true);
+    const blob = ext === "svg"
+      ? new Blob([out.svg], { type: "image/svg+xml" })
+      : await svgToPng(out.svg, out.width, out.height, 2);
+    try {
+      const { path } = await api("POST", "/api/export/" + name, blob);
+      setStatus("保存: " + path);
+    } catch (err) {
+      download(name, blob); // Neovim unreachable: fall back to a browser download
+      setStatus("Neovim に保存できずダウンロードしました: " + err.message, true);
+    }
+  } catch (err) {
+    setStatus("書き出し失敗: " + err.message, true);
+  }
+}
+window.roadmapExport = exportFile; // used by tests/e2e
+
+// ---------------------------------------------------------------- input
+function setLayout(layout) {
+  $("views").dataset.layout = layout;
+  document.querySelectorAll("[data-layout]").forEach((b) => b.tagName === "BUTTON" && b.setAttribute("aria-pressed", String(b.dataset.layout === layout)));
+  render();
+}
+function setZoom(z) { state.zoom = Math.min(3, Math.max(0.3, z)); render(); }
+
+function moveSelection(key) {
+  const order = state.model ? state.model.order : [];
+  if (!order.length) return;
+  const cur = state.selected;
+  if (!cur) return select(order[0]);
+  const i = order.indexOf(cur);
+  if (key === "down") return select(order[Math.min(order.length - 1, i + 1)]);
+  if (key === "up") return select(order[Math.max(0, i - 1)]);
+  const next = (key === "left" ? state.preds : state.succs).get(cur) || [];
+  if (next.length) select(next[0]);
+}
+
+document.addEventListener("click", (ev) => {
+  const w = ev.target.closest("[data-warning]");
+  if (w) { const ids = state.model.warnings[+w.dataset.warning].ids.filter((id) => state.byId.has(id)); if (ids.length) select(ids[0]); return; }
+  const el = ev.target.closest("[data-id]");
+  if (el) select(el.dataset.id, !el.closest("svg"));
+  if ($("help").classList.contains("open") && ev.target === $("help")) $("help").classList.remove("open");
+});
+document.querySelectorAll("button[data-layout]").forEach((b) => b.addEventListener("click", () => setLayout(b.dataset.layout)));
+$("zoom-in").addEventListener("click", () => setZoom(state.zoom * 1.2));
+$("zoom-out").addEventListener("click", () => setZoom(state.zoom / 1.2));
+$("reload").addEventListener("click", load);
+$("help-btn").addEventListener("click", () => $("help").classList.add("open"));
+$("export").addEventListener("change", (ev) => { const v = ev.target.value; ev.target.value = ""; if (v) exportFile(v); });
+$("search").addEventListener("keydown", (ev) => {
+  if (ev.key === "Enter") {
+    const q = ev.target.value.trim().toLowerCase();
+    const hit = q && state.model.nodes.find((n) => n.title.toLowerCase().includes(q) || n.id.includes(q));
+    if (hit) { select(hit.id); ev.target.blur(); } else setStatus("見つかりません: " + q, true);
+  } else if (ev.key === "Escape") { ev.target.value = ""; ev.target.blur(); }
+});
+for (const pane of [$("graph-pane"), $("gantt-pane")]) {
+  pane.addEventListener("wheel", (ev) => {
+    if (ev.ctrlKey || ev.metaKey) { ev.preventDefault(); setZoom(state.zoom * (ev.deltaY < 0 ? 1.1 : 1 / 1.1)); }
+  }, { passive: false });
+}
+document.addEventListener("keydown", (ev) => {
+  if (ev.target.matches("input, select, textarea")) return;
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const keys = {
+    ArrowDown: () => moveSelection("down"), j: () => moveSelection("down"),
+    ArrowUp: () => moveSelection("up"), k: () => moveSelection("up"),
+    ArrowLeft: () => moveSelection("left"), h: () => moveSelection("left"),
+    ArrowRight: () => moveSelection("right"), l: () => moveSelection("right"),
+    "/": () => $("search").focus(),
+    Escape: () => { $("help").classList.remove("open"); select(null); },
+    1: () => setLayout("split"), 2: () => setLayout("graph"), 3: () => setLayout("gantt"),
+    "+": () => setZoom(state.zoom * 1.2), "=": () => setZoom(state.zoom * 1.2),
+    "-": () => setZoom(state.zoom / 1.2), 0: () => setZoom(1),
+    e: () => exportFile("roadmap.png"), m: () => exportFile("mermaid"),
+    R: load, "?": () => $("help").classList.toggle("open"),
+  };
+  const fn = keys[ev.key];
+  if (fn) { ev.preventDefault(); fn(); }
+});
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
+
+if (!TOKEN) setStatus("トークンがありません。:RoadmapView から開いてください", true);
+load();
+setInterval(poll, 2000);
+</script>
+</body>
+</html>

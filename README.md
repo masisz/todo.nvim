@@ -6,6 +6,7 @@ A lightweight, distraction-free todo management plugin for Neovim.
 
 - Quick todo creation with custom template
 - Roadmap mode: mid/long-term milestones with linked daily todos and progress
+- Roadmap viewer: milestone dependency graph and gantt in the browser, PNG/SVG/Mermaid export
 - Automatically sequential todo files (`YYYYMMDD-01.todo`, `YYYYMMDD-02.todo`, ...)
 - Filetype detection and syntax highlighting for todos
 - Configurable todo directory, template, and extension
@@ -38,6 +39,8 @@ Default options:
 require("todo").setup({
   directory = "~/todos",
   roadmap_dir = "roadmap", -- milestones: ~/todos/roadmap/
+  deps_file = "deps.txt",  -- milestone dependencies: ~/todos/roadmap/deps.txt
+  export_dir = "export",   -- viewer output: ~/todos/roadmap/export/
   extension = "todo",
   date_format = "%Y%m%d",
   template = {
@@ -106,6 +109,37 @@ it empty for a one-off task. Completed items go to `done/` inside each folder.
    milestone.
 5. When the milestone is finished, select it in `:RoadmapList` and press Enter.
 
+### Milestone dependencies and the viewer
+
+Dependencies between milestones live in `~/todos/roadmap/deps.txt`, one per
+line as `<predecessor id> -> <successor id>` (`#` starts a comment):
+
+```
+# Milestone dependencies: <predecessor id> -> <successor id>
+20261101-01 -> 20261103-02
+20261101-01 -> 20261105-01
+```
+
+Successors are derived from these lines. Milestone files are not changed.
+
+`:RoadmapView` (or `v` in `:RoadmapList`) starts a small HTTP server inside
+Neovim on `127.0.0.1` and opens the viewer in the default browser
+(Safari, Chrome, Edge, Firefox):
+
+- dependency graph (left to right) and gantt (`start = Due - Duration`, `end = Due`)
+- red dashed arrows: the successor starts before its predecessor is due
+- red outline: critical path (the chain that drives the latest finish)
+- side panel with predecessors/successors and warnings (unknown ids, cycles,
+  schedule conflicts, missing Due)
+- export to `~/todos/roadmap/export/`: PNG and SVG of the graph, the gantt or
+  both, and `roadmap.md` with Mermaid flowchart + gantt
+- the page reloads automatically when milestone files or `deps.txt` change
+
+The server stops when Neovim exits or on `:RoadmapViewStop`. API requests
+need a per-session token that only the opened URL carries.
+
+`:RoadmapExport mermaid` writes `roadmap.md` without opening a browser.
+
 ## Commands
 
 | Command | Default key | Description |
@@ -114,6 +148,9 @@ it empty for a one-off task. Completed items go to `done/` inside each folder.
 | `:TodoList` | `<leader>Tl` | Open daily todos in a right-hand pane |
 | `:RoadmapNew` | | Create and open a new milestone in `roadmap/` |
 | `:RoadmapList` | `<leader>Tr` | Open milestones with their linked todos in a right-hand pane |
+| `:RoadmapView` | | Open the dependency graph and gantt in a browser |
+| `:RoadmapViewStop` | | Stop the viewer server |
+| `:RoadmapExport [mermaid]` | | Write `roadmap/export/roadmap.md` (Mermaid) |
 
 \* Set in the lazy.nvim example above; the plugin itself maps only `<leader>Tl`
 and `<leader>Tr`. `TaskNew` and `TaskList` remain available as compatibility
@@ -147,6 +184,7 @@ Each todo shows its Duration and linked milestone (`-> Release v1`).
 | `o` | Edit the milestone or todo under the cursor |
 | `n` | Create a daily todo linked to the milestone under the cursor (or the milestone of the todo under the cursor) |
 | `a` | Add a milestone |
+| `v` | Open the viewer (`:RoadmapView`) |
 | `t` | Switch to the todo list |
 | `r` | Switch to the roadmap |
 | `R` | Refresh |
