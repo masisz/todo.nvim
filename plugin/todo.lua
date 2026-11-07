@@ -28,6 +28,22 @@ vim.api.nvim_create_user_command("RoadmapList", function()
   require("todo").roadmap()
 end, { desc = "Open roadmap milestones with their linked todos" })
 
+vim.api.nvim_create_user_command("RoadmapView", function()
+  require("todo.viewer").open()
+end, { desc = "Open the roadmap dependency graph and gantt in a browser" })
+
+vim.api.nvim_create_user_command("RoadmapViewStop", function()
+  require("todo.viewer").stop()
+end, { desc = "Stop the roadmap viewer server" })
+
+vim.api.nvim_create_user_command("RoadmapExport", function(cmd)
+  require("todo.viewer").export(cmd.args)
+end, {
+  nargs = "?",
+  complete = function() return { "mermaid" } end,
+  desc = "Export the roadmap (mermaid: roadmap/export/roadmap.md)",
+})
+
 vim.keymap.set("n", "<leader>Tr", "<Cmd>RoadmapList<CR>", { desc = "Open roadmap" })
 
 -- Backward compatibility alias

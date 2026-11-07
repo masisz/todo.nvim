@@ -85,7 +85,7 @@ local function render(state)
     "t: TODO  r: Roadmap  R: Refresh  q: Close",
     "Space: Select  Enter: Complete",
     "o: Edit  a: Add  x: Delete",
-    state.kind == "roadmap" and "n: Add linked TODO" or "l: Link roadmap  c: Calendar",
+    state.kind == "roadmap" and "n: Add linked TODO  v: Viewer" or "l: Link roadmap  c: Calendar",
   }
   -- Keep help at the bottom of short lists; long lists can scroll down to it.
   local help_start = math.max(#lines + 1, vim.api.nvim_win_get_height(state.win) - #help)
@@ -330,6 +330,7 @@ function M.open(kind, reuse_win)
   if kind == "roadmap" then
     map("a", function() create(state, { kind = "roadmap" }) end, "Add a milestone")
     map("n", new_linked_todo, "New todo linked to the milestone under cursor")
+    map("v", function() require("todo.viewer").open() end, "Open dependency graph and gantt in a browser")
   else
     map("a", function() create(state, { kind = "daily" }) end, "Add a todo")
     map("l", link, "Link selected todos to a roadmap milestone")

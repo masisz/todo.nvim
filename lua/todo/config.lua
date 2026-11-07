@@ -3,6 +3,8 @@ local M = {}
 ---@class TodoConfig
 ---@field directory string Directory for daily todos; also the root of roadmap_dir (default: "~/todos")
 ---@field roadmap_dir string Subdirectory for roadmap milestones (default: "roadmap")
+---@field deps_file string Milestone dependency file inside roadmap_dir (default: "deps.txt")
+---@field export_dir string Output directory for roadmap images and Mermaid inside roadmap_dir (default: "export")
 ---@field extension string File extension for todo files (default: "todo")
 ---@field date_format string Date format for filename prefix (default: "%Y%m%d")
 ---@field template (string|fun():string)[] Template lines for new daily todos
@@ -18,6 +20,8 @@ end
 M.defaults = {
   directory = "~/todos",
   roadmap_dir = "roadmap",
+  deps_file = "deps.txt",
+  export_dir = "export",
   extension = "todo",
   date_format = "%Y%m%d",
   template = {
