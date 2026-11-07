@@ -75,7 +75,7 @@ function pngSize(buf) {
     await check("gantt renders bars, a milestone diamond and the undated section", async () => {
       assert.strictEqual(await page.locator("#gantt rect.bar").count(), 4);
       assert.strictEqual(await page.locator("#gantt path.bar").count(), 1);
-      assert.ok((await page.locator("#gantt").textContent()).includes("日付未設定"));
+      assert.ok((await page.locator("#gantt").textContent()).includes("No due date"));
     });
     await check("warnings list missing id, schedule conflict and undated", async () => {
       const text = await page.locator("#warnings").textContent();
@@ -120,7 +120,7 @@ function pngSize(buf) {
       await check(`export ${name}`, async () => {
         await page.evaluate((n) => window.roadmapExport(n), name);
         const status = await page.locator("#status").textContent();
-        assert.ok(status.startsWith("保存"), status);
+        assert.ok(status.startsWith("Saved"), status);
         const file = path.join(exportDir, name === "mermaid" ? "roadmap.md" : name);
         const data = fs.readFileSync(file);
         if (name.endsWith(".png")) {

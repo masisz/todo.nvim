@@ -30,7 +30,7 @@ The URL carries the token in its fragment (`http://127.0.0.1:<port>/#token=...`)
 On Windows it is opened with `rundll32 url.dll,FileProtocolHandler`; that path must keep the
 fragment.
 
-- [ ] Windows: `:RoadmapView` opens the default browser and the page loads data (no "トークンがありません")
+- [ ] Windows: `:RoadmapView` opens the default browser and the page loads data (no "Missing token" status)
 - [ ] macOS: same with Safari as the default browser
 - [ ] macOS: same with Chrome as the default browser
 
@@ -47,14 +47,14 @@ BROWSER=webkit node tests/e2e/viewer_check.js
 Then real Safari, on a roadmap with Japanese titles, via `:RoadmapView`:
 
 - [ ] Graph and gantt render; Japanese text uses Hiragino (not a fallback box font)
-- [ ] 書き出し → 両方 PNG / グラフ PNG / ガント PNG: files appear in `roadmap/export/`, open in Preview,
+- [ ] Export → Both PNG / Graph PNG / Gantt PNG: files appear in `roadmap/export/`, open in Preview,
       text is rendered (SVG -> canvas works without tainting; Japanese glyphs present)
-- [ ] 書き出し → SVG: files open in Safari and Preview
-- [ ] 書き出し → Mermaid: `roadmap/export/roadmap.md` renders in GitHub / VS Code preview
+- [ ] Export → SVG: files open in Safari and Preview
+- [ ] Export → Mermaid: `roadmap/export/roadmap.md` renders in GitHub / VS Code preview
 - [ ] Keys: arrows, h/j/k/l, `/` search, `1`/`2`/`3`, `+`/`-`/`0`, `e`, `m`, `R`, `?`, `Esc`
 - [ ] ⌘ + wheel / pinch zooms the diagram, not the page
 - [ ] Editing a milestone file in Neovim updates the page within ~2 s
-- [ ] After `:RoadmapViewStop`, the red "Neovim に接続できません" banner appears
+- [ ] After `:RoadmapViewStop`, the red "Cannot reach Neovim" banner appears
 
 ## 4. Edge on Windows
 

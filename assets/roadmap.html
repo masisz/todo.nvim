@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -108,66 +108,66 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
 <body>
 <header>
   <h1>Roadmap</h1>
-  <div class="group" role="group" aria-label="表示">
-    <button data-layout="split" aria-pressed="true" title="分割 (1)">分割</button>
-    <button data-layout="graph" aria-pressed="false" title="依存グラフ (2)">グラフ</button>
-    <button data-layout="gantt" aria-pressed="false" title="ガント (3)">ガント</button>
+  <div class="group" role="group" aria-label="Layout">
+    <button data-layout="split" aria-pressed="true" title="Split (1)">Split</button>
+    <button data-layout="graph" aria-pressed="false" title="Dependency graph (2)">Graph</button>
+    <button data-layout="gantt" aria-pressed="false" title="Gantt (3)">Gantt</button>
   </div>
-  <input id="search" type="search" placeholder="検索 (/)" aria-label="マイルストーン検索" list="titles">
+  <input id="search" type="search" placeholder="Search (/)" aria-label="Search milestones" list="titles">
   <datalist id="titles"></datalist>
   <div class="group">
-    <button id="zoom-out" title="縮小 (-)">−</button>
-    <button id="zoom-in" title="拡大 (+)">＋</button>
+    <button id="zoom-out" title="Zoom out (-)">−</button>
+    <button id="zoom-in" title="Zoom in (+)">+</button>
   </div>
   <span class="spacer"></span>
   <span id="status" role="status"></span>
-  <select id="export" aria-label="書き出し">
-    <option value="">書き出し…</option>
-    <option value="roadmap.png">両方 PNG</option>
-    <option value="roadmap.svg">両方 SVG</option>
-    <option value="graph.png">グラフ PNG</option>
-    <option value="graph.svg">グラフ SVG</option>
-    <option value="gantt.png">ガント PNG</option>
-    <option value="gantt.svg">ガント SVG</option>
+  <select id="export" aria-label="Export">
+    <option value="">Export…</option>
+    <option value="roadmap.png">Both PNG</option>
+    <option value="roadmap.svg">Both SVG</option>
+    <option value="graph.png">Graph PNG</option>
+    <option value="graph.svg">Graph SVG</option>
+    <option value="gantt.png">Gantt PNG</option>
+    <option value="gantt.svg">Gantt SVG</option>
     <option value="mermaid">Mermaid (roadmap.md)</option>
   </select>
-  <button id="reload" title="再読み込み (R)">再読み込み</button>
-  <button id="help-btn" title="キー操作 (?)">?</button>
+  <button id="reload" title="Reload (R)">Reload</button>
+  <button id="help-btn" title="Keys (?)">?</button>
 </header>
-<div id="banner" role="alert">Neovim に接続できません。<code>:RoadmapView</code> を実行し直してください。</div>
+<div id="banner" role="alert">Cannot reach Neovim. Run <code>:RoadmapView</code> again.</div>
 <main>
   <div id="views" data-layout="split">
-    <section id="graph-pane" class="pane" tabindex="0" aria-label="依存グラフ">
-      <span class="pane-title">依存グラフ</span>
+    <section id="graph-pane" class="pane" tabindex="0" aria-label="Dependency graph">
+      <span class="pane-title">Dependency graph</span>
       <div id="graph"></div>
     </section>
-    <section id="gantt-pane" class="pane" tabindex="0" aria-label="ガント">
-      <span class="pane-title">ガント</span>
+    <section id="gantt-pane" class="pane" tabindex="0" aria-label="Gantt">
+      <span class="pane-title">Gantt</span>
       <div id="gantt"></div>
     </section>
   </div>
   <aside>
-    <h2>選択中</h2>
-    <div id="detail"><p class="empty">マイルストーンをクリックするか、矢印キーで選択</p></div>
-    <h2 id="warn-title">警告</h2>
+    <h2>Selected</h2>
+    <div id="detail"><p class="empty">Click a milestone or use the arrow keys</p></div>
+    <h2 id="warn-title">Warnings</h2>
     <ul id="warnings" class="warnings"></ul>
   </aside>
 </main>
-<div id="help" role="dialog" aria-modal="true" aria-label="キー操作">
+<div id="help" role="dialog" aria-modal="true" aria-label="Keys">
   <div class="box">
     <table>
-      <tr><td><kbd>↑</kbd><kbd>↓</kbd> / <kbd>j</kbd><kbd>k</kbd></td><td>前後のマイルストーン（依存順）</td></tr>
-      <tr><td><kbd>←</kbd> / <kbd>h</kbd></td><td>前パスへ移動</td></tr>
-      <tr><td><kbd>→</kbd> / <kbd>l</kbd></td><td>後パスへ移動</td></tr>
-      <tr><td><kbd>/</kbd></td><td>検索（Enter で選択）</td></tr>
-      <tr><td><kbd>Esc</kbd></td><td>選択解除・閉じる</td></tr>
-      <tr><td><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></td><td>分割 / グラフ / ガント</td></tr>
-      <tr><td><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></td><td>拡大 / 縮小 / 等倍（Ctrl/⌘+ホイールでも可）</td></tr>
-      <tr><td><kbd>e</kbd></td><td>両方を PNG で書き出し</td></tr>
-      <tr><td><kbd>m</kbd></td><td>Mermaid を書き出し</td></tr>
-      <tr><td><kbd>R</kbd></td><td>再読み込み</td></tr>
+      <tr><td><kbd>↑</kbd><kbd>↓</kbd> / <kbd>j</kbd><kbd>k</kbd></td><td>Next / previous milestone (dependency order)</td></tr>
+      <tr><td><kbd>←</kbd> / <kbd>h</kbd></td><td>Go to predecessor</td></tr>
+      <tr><td><kbd>→</kbd> / <kbd>l</kbd></td><td>Go to successor</td></tr>
+      <tr><td><kbd>/</kbd></td><td>Search (Enter selects)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Clear selection / close</td></tr>
+      <tr><td><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></td><td>Split / graph / gantt</td></tr>
+      <tr><td><kbd>+</kbd><kbd>-</kbd><kbd>0</kbd></td><td>Zoom in / out / reset (also Ctrl/⌘ + wheel)</td></tr>
+      <tr><td><kbd>e</kbd></td><td>Export both as PNG</td></tr>
+      <tr><td><kbd>m</kbd></td><td>Export Mermaid</td></tr>
+      <tr><td><kbd>R</kbd></td><td>Reload</td></tr>
     </table>
-    <p class="empty">書き出し先: roadmap/export/</p>
+    <p class="empty">Exports go to roadmap/export/</p>
   </div>
 </div>
 <script>
@@ -230,9 +230,9 @@ async function load() {
     if (state.selected && !state.byId.has(state.selected)) state.selected = null;
     $("titles").innerHTML = model.nodes.map((n) => `<option value="${esc(n.title)}">`).join("");
     render();
-    setStatus(`${model.nodes.length} 件 · ${model.edges.length} 依存`);
+    setStatus(`${model.nodes.length} milestones · ${model.edges.length} dependencies`);
   } catch (err) {
-    setStatus("読み込み失敗: " + err.message, true);
+    setStatus("Load failed: " + err.message, true);
   }
 }
 
@@ -332,7 +332,7 @@ function graphSvg(forExport) {
   }
   for (const n of model.nodes) {
     const { x, y } = xy.get(n.id);
-    const sub = n.due ? `${n.start === n.finish ? "" : n.start + " → "}${n.due}` : "日付未設定";
+    const sub = n.due ? `${n.start === n.finish ? "" : n.start + " → "}${n.due}` : "No due date";
     out.push(`<g class="n ${forExport ? nodeClass({ ...n, id: "" }) : nodeClass(n)}" data-id="${esc(n.id)}" transform="translate(${x},${y})">` +
       `<rect width="${G.W}" height="${G.H}" rx="8"/>` +
       `<text x="10" y="21">${esc(fit(n.title, 13, G.W - 20))}</text>` +
@@ -407,7 +407,7 @@ function ganttSvg(forExport) {
   });
   if (undated.length) {
     let y = T.HEAD + rows.length * T.ROW;
-    out.push(`<text class="axis" x="${T.PAD}" y="${y + 18}">日付未設定</text>`);
+    out.push(`<text class="axis" x="${T.PAD}" y="${y + 18}">No due date</text>`);
     undated.forEach((n) => {
       y += T.ROW;
       out.push(`<text class="row-label ${n.done ? "done" : ""}" data-id="${esc(n.id)}" x="${T.PAD}" y="${y + 18}">${esc(fit(n.title, 12, T.LABEL - T.PAD))}</text>`);
@@ -421,7 +421,7 @@ function ganttSvg(forExport) {
 function render() {
   if (!state.model) return;
   const g = graphSvg(false), t = ganttSvg(false);
-  $("graph").innerHTML = g ? g.svg : '<p class="empty" style="padding:0 16px">roadmap/ にマイルストーンがありません</p>';
+  $("graph").innerHTML = g ? g.svg : '<p class="empty" style="padding:0 16px">No milestones in roadmap/</p>';
   $("gantt").innerHTML = t ? t.svg : "";
   renderSide();
 }
@@ -433,23 +433,23 @@ function renderSide() {
     return `<li><a data-id="${esc(id)}">${esc(m ? m.title : id)}</a></li>`;
   };
   if (!n) {
-    $("detail").innerHTML = '<p class="empty">マイルストーンをクリックするか、矢印キーで選択</p>';
+    $("detail").innerHTML = '<p class="empty">Click a milestone or use the arrow keys</p>';
   } else {
     const preds = state.preds.get(n.id), succs = state.succs.get(n.id);
     $("detail").innerHTML =
-      `<dl><dt>タイトル</dt><dd>${esc(n.title)}</dd><dt>ID</dt><dd>${esc(n.id)}</dd>` +
-      `<dt>期間</dt><dd>${n.due ? esc(n.start) + " → " + esc(n.due) : "日付未設定"}</dd>` +
+      `<dl><dt>Title</dt><dd>${esc(n.title)}</dd><dt>ID</dt><dd>${esc(n.id)}</dd>` +
+      `<dt>Period</dt><dd>${n.due ? esc(n.start) + " → " + esc(n.due) : "No due date"}</dd>` +
       `<dt>Duration</dt><dd>${esc(n.duration || "-")}</dd>` +
-      `<dt>状態</dt><dd>${n.done ? "完了" : n.critical ? "未完了・クリティカルパス" : "未完了"}</dd>` +
-      `<dt>ファイル</dt><dd>${esc(n.path)}</dd></dl>` +
-      `<h2>前パス</h2>${preds.length ? `<ul class="links">${preds.map(link).join("")}</ul>` : '<p class="empty">なし</p>'}` +
-      `<h2>後パス</h2>${succs.length ? `<ul class="links">${succs.map(link).join("")}</ul>` : '<p class="empty">なし</p>'}`;
+      `<dt>Status</dt><dd>${n.done ? "Done" : n.critical ? "Open · critical path" : "Open"}</dd>` +
+      `<dt>File</dt><dd>${esc(n.path)}</dd></dl>` +
+      `<h2>Predecessors</h2>${preds.length ? `<ul class="links">${preds.map(link).join("")}</ul>` : '<p class="empty">None</p>'}` +
+      `<h2>Successors</h2>${succs.length ? `<ul class="links">${succs.map(link).join("")}</ul>` : '<p class="empty">None</p>'}`;
   }
   const ws = state.model.warnings;
-  $("warn-title").textContent = `警告 (${ws.length})`;
+  $("warn-title").textContent = `Warnings (${ws.length})`;
   $("warnings").innerHTML = ws.length
     ? ws.map((w, i) => `<li data-warning="${i}">${esc(w.message)}</li>`).join("")
-    : '<li class="empty" style="color:var(--muted)">なし</li>';
+    : '<li class="empty" style="color:var(--muted)">None</li>';
 }
 
 function select(id, scroll) {
@@ -511,23 +511,23 @@ async function exportFile(name) {
   try {
     if (name === "mermaid") {
       const { path } = await api("POST", "/api/export/mermaid");
-      return setStatus("保存: " + path);
+      return setStatus("Saved: " + path);
     }
     const [kind, ext] = name.split(".");
     const out = exportSvg(kind);
-    if (!out) return setStatus("書き出す内容がありません", true);
+    if (!out) return setStatus("Nothing to export", true);
     const blob = ext === "svg"
       ? new Blob([out.svg], { type: "image/svg+xml" })
       : await svgToPng(out.svg, out.width, out.height, 2);
     try {
       const { path } = await api("POST", "/api/export/" + name, blob);
-      setStatus("保存: " + path);
+      setStatus("Saved: " + path);
     } catch (err) {
       download(name, blob); // Neovim unreachable: fall back to a browser download
-      setStatus("Neovim に保存できずダウンロードしました: " + err.message, true);
+      setStatus("Could not save via Neovim, downloaded instead: " + err.message, true);
     }
   } catch (err) {
-    setStatus("書き出し失敗: " + err.message, true);
+    setStatus("Export failed: " + err.message, true);
   }
 }
 window.roadmapExport = exportFile; // used by tests/e2e
@@ -569,7 +569,7 @@ $("search").addEventListener("keydown", (ev) => {
   if (ev.key === "Enter") {
     const q = ev.target.value.trim().toLowerCase();
     const hit = q && state.model.nodes.find((n) => n.title.toLowerCase().includes(q) || n.id.includes(q));
-    if (hit) { select(hit.id); ev.target.blur(); } else setStatus("見つかりません: " + q, true);
+    if (hit) { select(hit.id); ev.target.blur(); } else setStatus("Not found: " + q, true);
   } else if (ev.key === "Escape") { ev.target.value = ""; ev.target.blur(); }
 });
 for (const pane of [$("graph-pane"), $("gantt-pane")]) {
@@ -599,7 +599,7 @@ document.addEventListener("keydown", (ev) => {
 let resizeTimer;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(render, 150); });
 
-if (!TOKEN) setStatus("トークンがありません。:RoadmapView から開いてください", true);
+if (!TOKEN) setStatus("Missing token. Open this page with :RoadmapView", true);
 load();
 setInterval(poll, 2000);
 </script>
