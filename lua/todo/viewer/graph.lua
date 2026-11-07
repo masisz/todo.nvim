@@ -380,6 +380,7 @@ function M.load()
   vim.list_extend(items, store.scan("roadmap", true))
   local edges, warnings = M.read_deps()
   local model = M.analyze(M.nodes_from(items), edges, warnings)
+  model.raw_edges = edges -- Keep unknown-id dependencies when the viewer adds a connection.
   model.deps_version = M.deps_version()
   return model
 end

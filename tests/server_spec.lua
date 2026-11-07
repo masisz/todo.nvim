@@ -100,6 +100,21 @@ h.test("PUT deps validates, writes and detects conflicts", function()
   h.eq(edges, (graph.read_deps()))
 end)
 
+h.test("roadmap exposes unknown-id edges so viewer edits preserve them", function()
+  setup()
+  local edges = { { from = "20261101-01", to = "missing-id" } }
+  assert(graph.write_deps(edges))
+  local _, body = request("GET", "/api/roadmap")
+  local model = vim.json.decode(body)
+  h.eq(edges, model.raw_edges)
+  local updated = model.raw_edges
+  updated[#updated + 1] = { from = "20261101-01", to = "20261101-02" }
+  h.eq(200, (request("PUT", "/api/deps", {
+    body = vim.json.encode({ deps_version = model.deps_version, edges = updated }),
+  })))
+  h.eq(updated, (graph.read_deps()))
+end)
+
 h.test("export endpoints write whitelisted files only", function()
   local dir = setup()
   local png = "\137PNG\r\n\26\n\0binary\255"

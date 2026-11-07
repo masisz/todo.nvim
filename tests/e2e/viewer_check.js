@@ -115,6 +115,58 @@ function pngSize(buf) {
       assert.ok(await page.locator("#gantt-pane").isVisible());
     });
 
+    const depsFile = path.join(dir, "roadmap", "deps.txt");
+    async function dragConnection(from, to, cancel) {
+      await page.locator('#graph .n[data-id="' + from + '"] .connector').scrollIntoViewIfNeeded();
+      const a = await page.locator('#graph .n[data-id="' + from + '"] .connector').boundingBox();
+      await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+      await page.mouse.down();
+      if (to) {
+        await page.locator('#graph .n[data-id="' + to + '"]').scrollIntoViewIfNeeded();
+        const b = await page.locator('#graph .n[data-id="' + to + '"]').boundingBox();
+        await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 8 });
+      } else await page.mouse.move(5, 5);
+      if (cancel) await page.keyboard.press("Escape");
+      await page.mouse.up();
+    }
+    await check("drag connects successor and preserves unknown-id dependencies", async () => {
+      await dragConnection("20261101-03", "20261101-04");
+      await page.waitForFunction(() => document.getElementById("status").textContent === "Connection saved");
+      const text = fs.readFileSync(depsFile, "utf8");
+      assert.ok(text.includes("20261101-03 -> 20261101-04"));
+      assert.ok(text.includes("20261101-03 -> missing-id"));
+      assert.strictEqual(await page.locator("#graph .e").count(), 5);
+    });
+    await check("duplicate, self and cyclic drags do not write dependencies", async () => {
+      const before = fs.readFileSync(depsFile, "utf8");
+      for (const [from, to, message] of [
+        ["20261101-03", "20261101-04", "already connected"],
+        ["20261101-03", "20261101-03", "cycle"],
+        ["20261101-04", "20261101-01", "cycle"],
+      ]) {
+        await dragConnection(from, to);
+        assert.ok((await page.locator("#status").textContent()).includes(message));
+        assert.strictEqual(fs.readFileSync(depsFile, "utf8"), before);
+      }
+    });
+    await check("Escape and empty drops cancel, including at zoom", async () => {
+      const before = fs.readFileSync(depsFile, "utf8");
+      await page.keyboard.press("+");
+      await dragConnection("20261101-03", "20261101-05", true);
+      await dragConnection("20261101-03", null);
+      assert.strictEqual(await page.locator(".connection-preview").count(), 0);
+      assert.strictEqual(fs.readFileSync(depsFile, "utf8"), before);
+      await page.keyboard.press("0");
+    });
+    await check("zoomed drag persists after page reload", async () => {
+      await page.keyboard.press("+");
+      await dragConnection("20261101-04", "20261101-05");
+      await page.waitForFunction(() => document.getElementById("status").textContent === "Connection saved");
+      await page.reload();
+      await page.waitForSelector("#graph .n");
+      assert.strictEqual(await page.locator("#graph .e").count(), 6);
+    });
+
     const exportDir = path.join(dir, "roadmap", "export");
     for (const name of ["graph.png", "gantt.png", "roadmap.png", "graph.svg", "gantt.svg", "roadmap.svg", "mermaid"]) {
       await check(`export ${name}`, async () => {

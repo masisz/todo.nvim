@@ -127,6 +127,9 @@ Neovim on `127.0.0.1` and opens the viewer in the default browser
 (Safari, Chrome, Edge, Firefox):
 
 - dependency graph (left to right) and gantt (`start = Due - Duration`, `end = Due`)
+- drag the dot on a milestone's right edge onto its successor in the dependency
+  graph to save a connection to `deps.txt`; press Esc or drop on empty space to
+  cancel. Duplicate connections and cycles are rejected. Dates are unchanged.
 - red dashed arrows: the successor starts before its predecessor is due
 - red outline: critical path (the chain that drives the latest finish)
 - side panel with predecessors/successors and warnings (unknown ids, cycles,

@@ -87,6 +87,10 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
 .n.crit rect { stroke: var(--crit); stroke-width: 2; }
 .n.sel rect, .bar.sel { stroke: var(--select) !important; stroke-width: 3 !important; }
 .n, .bar, .row-label { cursor: pointer; }
+.connector { fill: var(--accent); stroke: var(--node); stroke-width: 2; cursor: crosshair; touch-action: none; }
+.n.drop-target rect { stroke: var(--accent) !important; stroke-width: 3 !important; }
+.connection-preview { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
+#graph { user-select: none; }
 .e { fill: none; stroke: var(--node-stroke); stroke-width: 1.4; }
 .e.crit { stroke: var(--crit); stroke-width: 2; }
 .e.bad { stroke: var(--crit); stroke-dasharray: 5 4; }
@@ -139,6 +143,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
   <div id="views" data-layout="split">
     <section id="graph-pane" class="pane" tabindex="0" aria-label="Dependency graph">
       <span class="pane-title">Dependency graph</span>
+      <p class="empty">Drag a milestone's right-hand dot onto its successor to connect. Esc cancels.</p>
       <div id="graph"></div>
     </section>
     <section id="gantt-pane" class="pane" tabindex="0" aria-label="Gantt">
@@ -156,6 +161,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
 <div id="help" role="dialog" aria-modal="true" aria-label="Keys">
   <div class="box">
     <table>
+      <tr><td>Drag right-hand dot</td><td>Connect to a successor; Esc cancels</td></tr>
       <tr><td><kbd>↑</kbd><kbd>↓</kbd> / <kbd>j</kbd><kbd>k</kbd></td><td>Next / previous milestone (dependency order)</td></tr>
       <tr><td><kbd>←</kbd> / <kbd>h</kbd></td><td>Go to predecessor</td></tr>
       <tr><td><kbd>→</kbd> / <kbd>l</kbd></td><td>Go to successor</td></tr>
@@ -196,6 +202,7 @@ const T = { LABEL: 210, ROW: 28, HEAD: 44, PAD: 16 };
 const DAY = 86400000;
 
 const state = { model: null, byId: new Map(), preds: new Map(), succs: new Map(), selected: null, zoom: 1, version: null, offline: false };
+let connection = null, savingConnection = false, suppressClick = false;
 const $ = (id) => document.getElementById(id);
 const arr = (x) => (Array.isArray(x) ? x : []); // vim.json encodes empty lists as {}
 
@@ -237,6 +244,7 @@ async function load() {
 }
 
 async function poll() {
+  if (connection || savingConnection) return;
   try {
     const { version } = await api("GET", "/api/version");
     if (state.offline) { state.offline = false; $("banner").classList.remove("show"); }
@@ -336,7 +344,8 @@ function graphSvg(forExport) {
     out.push(`<g class="n ${forExport ? nodeClass({ ...n, id: "" }) : nodeClass(n)}" data-id="${esc(n.id)}" transform="translate(${x},${y})">` +
       `<rect width="${G.W}" height="${G.H}" rx="8"/>` +
       `<text x="10" y="21">${esc(fit(n.title, 13, G.W - 20))}</text>` +
-      `<text class="sub" x="10" y="39">${esc(fit(sub + "  " + n.duration, 11, G.W - 20))}</text></g>`);
+      `<text class="sub" x="10" y="39">${esc(fit(sub + "  " + n.duration, 11, G.W - 20))}</text>` +
+      (forExport ? "" : `<circle class="connector" cx="${G.W}" cy="${G.H / 2}" r="7"><title>Drag to a successor</title></circle>`) + `</g>`);
   }
   out.push("</svg>");
   return { svg: out.join(""), width, height };
@@ -419,7 +428,7 @@ function ganttSvg(forExport) {
 
 // ---------------------------------------------------------------- render
 function render() {
-  if (!state.model) return;
+  if (!state.model || connection) return;
   const g = graphSvg(false), t = ganttSvg(false);
   $("graph").innerHTML = g ? g.svg : '<p class="empty" style="padding:0 16px">No milestones in roadmap/</p>';
   $("gantt").innerHTML = t ? t.svg : "";
@@ -464,6 +473,74 @@ function select(id, scroll) {
 }
 
 // ---------------------------------------------------------------- export
+// Connect using the complete dependency list, including edges with missing milestones.
+async function connectMilestones(from, to) {
+  const edges = arr(state.model.raw_edges).map((e) => ({ from: e.from, to: e.to }));
+  if (edges.some((e) => e.from === from && e.to === to)) {
+    setStatus("These milestones are already connected"); return;
+  }
+  const seen = new Set(), pending = [to];
+  while (pending.length) {
+    const id = pending.pop();
+    if (id === from) { setStatus("Cannot connect: this would create a cycle", true); return; }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    edges.filter((e) => e.from === id).forEach((e) => pending.push(e.to));
+  }
+  savingConnection = true;
+  setStatus("Saving connection…");
+  try {
+    await api("PUT", "/api/deps", JSON.stringify({ deps_version: state.model.deps_version, edges: [...edges, { from, to }] }));
+    await load();
+    setStatus("Connection saved");
+  } catch (err) {
+    setStatus("Connection not saved: " + err.message + ". Press R to reload before retrying.", true);
+  } finally { savingConnection = false; }
+}
+
+function cancelConnection() {
+  if (!connection) return;
+  connection.preview.remove();
+  document.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+  connection = null;
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 0);
+}
+
+$("graph").addEventListener("pointerdown", (ev) => {
+  const handle = ev.target.closest(".connector");
+  if (!handle || ev.button !== 0 || savingConnection || connection) return;
+  ev.preventDefault();
+  const node = handle.closest(".n"), svg = handle.ownerSVGElement;
+  const preview = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  preview.setAttribute("class", "connection-preview");
+  svg.appendChild(preview);
+  const point = svg.createSVGPoint(); point.x = ev.clientX; point.y = ev.clientY;
+  const start = point.matrixTransform(svg.getScreenCTM().inverse());
+  connection = { from: node.dataset.id, svg, preview, start, pointerId: ev.pointerId };
+  setStatus("Drop onto the successor milestone; Esc cancels");
+});
+document.addEventListener("pointermove", (ev) => {
+  if (!connection || ev.pointerId !== connection.pointerId) return;
+  const { svg, preview, start } = connection;
+  const point = svg.createSVGPoint(); point.x = ev.clientX; point.y = ev.clientY;
+  const end = point.matrixTransform(svg.getScreenCTM().inverse());
+  preview.setAttribute("d", `M${start.x},${start.y} L${end.x},${end.y}`);
+  document.querySelectorAll(".drop-target").forEach((el) => el.classList.remove("drop-target"));
+  const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#graph .n");
+  if (target && target.dataset.id !== connection.from) target.classList.add("drop-target");
+});
+document.addEventListener("pointerup", (ev) => {
+  if (!connection || ev.pointerId !== connection.pointerId) return;
+  const from = connection.from;
+  const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest("#graph .n");
+  cancelConnection();
+  if (target) connectMilestones(from, target.dataset.id);
+  else setStatus("Connection cancelled");
+});
+document.addEventListener("pointercancel", cancelConnection);
+window.addEventListener("blur", cancelConnection);
+
 function combinedSvg() {
   const g = graphSvg(true), t = ganttSvg(true);
   const parts = [g, t].filter(Boolean);
@@ -553,6 +630,7 @@ function moveSelection(key) {
 }
 
 document.addEventListener("click", (ev) => {
+  if (suppressClick) return;
   const w = ev.target.closest("[data-warning]");
   if (w) { const ids = state.model.warnings[+w.dataset.warning].ids.filter((id) => state.byId.has(id)); if (ids.length) select(ids[0]); return; }
   const el = ev.target.closest("[data-id]");
@@ -578,6 +656,10 @@ for (const pane of [$("graph-pane"), $("gantt-pane")]) {
   }, { passive: false });
 }
 document.addEventListener("keydown", (ev) => {
+  if (connection) {
+    if (ev.key === "Escape") { ev.preventDefault(); cancelConnection(); setStatus("Connection cancelled"); }
+    return;
+  }
   if (ev.target.matches("input, select, textarea")) return;
   if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const keys = {
