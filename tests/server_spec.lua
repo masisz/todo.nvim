@@ -14,7 +14,7 @@ local function request(method, path, opts)
   for k, v in pairs(headers) do
     if v ~= false then lines[#lines + 1] = k .. ": " .. v end
   end
-  lines[#lines + 1] = "Content-Length: " .. #body
+  lines[#lines + 1] = "Content-Length: " .. (opts.declared_length or #body)
   local raw = table.concat(lines, "\r\n") .. "\r\n\r\n" .. body
 
   local client, chunks, done = uv.new_tcp(), {}, false
@@ -67,6 +67,74 @@ h.test("api rejects missing token and foreign Host", function()
   h.eq(403, (request("GET", "/api/roadmap", { headers = { ["X-Token"] = "wrong" } })))
   h.eq(403, (request("GET", "/api/roadmap", { headers = { ["X-Token"] = false } })))
   h.eq(403, (request("GET", "/", { headers = { Host = "evil.example:" .. server.state.port } })))
+end)
+
+h.test("unauthorized requests are rejected before their bodies arrive", function()
+  setup()
+  h.eq(403, (request("PUT", "/api/deps", {
+    headers = { ["X-Token"] = "wrong" }, declared_length = server.MAX_BODY,
+  })))
+  h.eq(403, (request("PUT", "/api/deps", {
+    headers = { Host = "evil.example" }, declared_length = server.MAX_BODY,
+  })))
+end)
+
+h.test("incomplete requests time out", function()
+  setup()
+  local previous = server.REQUEST_TIMEOUT
+  server.REQUEST_TIMEOUT = 30
+  local ok, status = pcall(request, "PUT", "/api/deps", { declared_length = 100 })
+  server.REQUEST_TIMEOUT = previous
+  h.ok(ok, status)
+  h.eq(nil, status)
+end)
+
+h.test("connection limit rejects excess clients and stop closes pending clients", function()
+  setup()
+  local previous = server.MAX_CLIENTS
+  server.MAX_CLIENTS = 1
+  local client, connected, closed = uv.new_tcp(), false, false
+  client:connect("127.0.0.1", server.state.port, function(connect_err)
+    assert(not connect_err, connect_err)
+    connected = true
+    client:write("GET / HTTP/1.1\r\n")
+    client:read_start(function(_, chunk)
+      if not chunk then closed = true; client:close() end
+    end)
+  end)
+  assert(vim.wait(1000, function() return connected end, 10))
+  vim.wait(30, function() return false end, 5)
+  local ok, status = pcall(request, "GET", "/")
+  server.MAX_CLIENTS = previous
+  server.stop()
+  h.ok(ok, status)
+  h.eq(nil, status)
+  h.ok(vim.wait(1000, function() return closed end, 10))
+end)
+
+h.test("HTTP parser rejects ambiguous lengths and oversized complete headers", function()
+  for _, length in ipairs({ "1.5", "1e3", "-1", "nan" }) do
+    local _, message = server.parse_request("PUT /api/deps HTTP/1.1\r\nContent-Length: " .. length .. "\r\n\r\n")
+    h.eq("bad content-length", message)
+  end
+  local _, message = server.parse_request("GET / HTTP/1.1\r\nX-Pad: " .. string.rep("a", 65536) .. "\r\n\r\n")
+  h.eq("headers too large", message)
+end)
+
+h.test("viewer cannot be framed and token randomness fails closed", function()
+  setup()
+  local _, _, raw = request("GET", "/")
+  h.ok(raw:find("frame-ancestors 'none'", 1, true))
+  h.ok(raw:find("X-Frame-Options: DENY", 1, true))
+  server.stop()
+  local random = uv.random
+  uv.random = function() return nil, "unavailable" end
+  local ok, url, message = pcall(server.start)
+  uv.random = random
+  h.ok(ok, url)
+  h.eq(nil, url)
+  h.eq("secure random token generation failed", message)
+  h.eq(nil, server.state)
 end)
 
 h.test("roadmap and version endpoints return JSON", function()
