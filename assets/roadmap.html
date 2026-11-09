@@ -60,7 +60,7 @@ dt { color: var(--muted); }
 dd { margin: 0; word-break: break-all; }
 ul.links, ul.warnings { list-style: none; padding: 0; margin: 0; font-size: 13px; }
 ul.links li a, ul.warnings li { cursor: pointer; }
-ul.links li a { color: var(--accent); text-decoration: none; }
+ul.links li a, a.plain { color: var(--accent); text-decoration: none; cursor: pointer; }
 ul.warnings li { padding: 4px 0; border-bottom: 1px dashed var(--line); color: var(--warn); }
 .empty { color: var(--muted); font-size: 13px; }
 #search { width: 14em; }
@@ -95,8 +95,16 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
 .e.crit { stroke: var(--crit); stroke-width: 2; }
 .e.bad { stroke: var(--crit); stroke-dasharray: 5 4; }
 .e.hl { stroke: var(--select); stroke-width: 2.4; }
+.e.esel { stroke: var(--select); stroke-width: 3.2; stroke-dasharray: none; }
+.e-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.e-hit:hover { stroke: var(--accent); stroke-opacity: .25; }
 .arrow { fill: var(--node-stroke); }
 .arrow.crit, .arrow.bad { fill: var(--crit); }
+.arrow.esel { fill: var(--select); }
+button.danger { color: var(--crit); border-color: var(--crit); margin-top: 8px; }
+button.danger:hover { background: var(--crit); color: #fff; }
+button.unlink { padding: 0 6px; margin-left: 6px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+button.unlink:hover { color: var(--crit); border-color: var(--crit); }
 .grid { stroke: var(--grid); stroke-width: 1; }
 .axis { fill: var(--muted); font-size: 11px; }
 .today { stroke: var(--accent); stroke-dasharray: 3 3; }
@@ -143,7 +151,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
   <div id="views" data-layout="split">
     <section id="graph-pane" class="pane" tabindex="0" aria-label="Dependency graph">
       <span class="pane-title">Dependency graph</span>
-      <p class="empty">Drag a milestone's right-hand dot onto its successor to connect. Esc cancels.</p>
+      <p class="empty">Drag a milestone's right-hand dot onto its successor to connect. Click a line and press Delete to remove it. Esc cancels.</p>
       <div id="graph"></div>
     </section>
     <section id="gantt-pane" class="pane" tabindex="0" aria-label="Gantt">
@@ -153,7 +161,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
   </div>
   <aside>
     <h2>Selected</h2>
-    <div id="detail"><p class="empty">Click a milestone or use the arrow keys</p></div>
+    <div id="detail"><p class="empty">Click a milestone or a dependency line, or use the arrow keys</p></div>
     <h2 id="warn-title">Warnings</h2>
     <ul id="warnings" class="warnings"></ul>
   </aside>
@@ -162,6 +170,8 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hir
   <div class="box">
     <table>
       <tr><td>Drag right-hand dot</td><td>Connect to a successor; Esc cancels</td></tr>
+      <tr><td>Click a line</td><td>Select a dependency</td></tr>
+      <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Delete the selected dependency</td></tr>
       <tr><td><kbd>↑</kbd><kbd>↓</kbd> / <kbd>j</kbd><kbd>k</kbd></td><td>Next / previous milestone (dependency order)</td></tr>
       <tr><td><kbd>←</kbd> / <kbd>h</kbd></td><td>Go to predecessor</td></tr>
       <tr><td><kbd>→</kbd> / <kbd>l</kbd></td><td>Go to successor</td></tr>
@@ -201,7 +211,7 @@ const G = { W: 184, H: 50, GX: 64, GY: 18, PAD: 24 };
 const T = { LABEL: 210, ROW: 28, HEAD: 44, PAD: 16 };
 const DAY = 86400000;
 
-const state = { model: null, byId: new Map(), preds: new Map(), succs: new Map(), selected: null, zoom: 1, version: null, offline: false };
+const state = { model: null, byId: new Map(), preds: new Map(), succs: new Map(), selected: null, selectedEdge: null, zoom: 1, version: null, offline: false };
 let connection = null, savingConnection = false, suppressClick = false;
 const $ = (id) => document.getElementById(id);
 const arr = (x) => (Array.isArray(x) ? x : []); // vim.json encodes empty lists as {}
@@ -235,6 +245,7 @@ async function load() {
     state.succs = new Map(model.nodes.map((n) => [n.id, []]));
     for (const e of model.edges) { state.preds.get(e.to).push(e.from); state.succs.get(e.from).push(e.to); }
     if (state.selected && !state.byId.has(state.selected)) state.selected = null;
+    if (state.selectedEdge && !findEdge(state.selectedEdge.from, state.selectedEdge.to)) state.selectedEdge = null;
     $("titles").innerHTML = model.nodes.map((n) => `<option value="${esc(n.title)}">`).join("");
     render();
     setStatus(`${model.nodes.length} milestones · ${model.edges.length} dependencies`);
@@ -277,10 +288,25 @@ function svgOpen(w, h, forExport) {
     (forExport ? "" : ` style="width:${w * state.zoom}px;height:${h * state.zoom}px"`) + ">";
 }
 function defs(prefix) {
-  return `<defs>${["", "crit", "bad"].map((k) =>
+  return `<defs>${["", "crit", "bad", "esel"].map((k) =>
     `<marker id="${prefix}-a${k}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow ${k}" d="M0,0 L10,5 L0,10 z"/></marker>`).join("")}</defs>`;
 }
 const edgeKind = (e) => (e.violated ? "bad" : e.critical ? "crit" : "");
+const findEdge = (from, to) => state.model && state.model.edges.find((e) => e.from === from && e.to === to);
+const isEdgeSelected = (e) => !!state.selectedEdge && state.selectedEdge.from === e.from && state.selectedEdge.to === e.to;
+// Visible edge path, plus (on screen only) a wide transparent path that is easy to click.
+function edgePath(e, d, prefix, sel, forExport) {
+  if (forExport) return `<path class="e ${edgeKind(e)}" marker-end="url(#${prefix}-a${edgeKind(e)})" d="${d}"/>`;
+  const esel = isEdgeSelected(e);
+  const kind = esel ? "esel" : edgeKind(e);
+  const hl = !esel && sel && (e.from === sel || e.to === sel) ? " hl" : "";
+  return `<path class="e-hit" data-edge-from="${esc(e.from)}" data-edge-to="${esc(e.to)}" d="${d}"><title>${esc(edgeLabel(e))} (click to select)</title></path>` +
+    `<path class="e ${edgeKind(e)}${hl}${esel ? " esel" : ""}" marker-end="url(#${prefix}-a${kind})" d="${d}" pointer-events="none"/>`;
+}
+function edgeLabel(e) {
+  const title = (id) => (state.byId.get(id) || { title: id }).title;
+  return `${title(e.from)} → ${title(e.to)}`;
+}
 
 // ---------------------------------------------------------------- graph layout
 // Layered DAG layout: rank = longest path from a source, then barycenter sweeps to reduce crossings.
@@ -335,8 +361,7 @@ function graphSvg(forExport) {
     const a = xy.get(e.from), b = xy.get(e.to);
     const x1 = a.x + G.W, y1 = a.y + G.H / 2, x2 = b.x, y2 = b.y + G.H / 2;
     const dx = Math.max(30, Math.abs(x2 - x1) / 2);
-    const hl = sel && (e.from === sel || e.to === sel) ? " hl" : "";
-    out.push(`<path class="e ${edgeKind(e)}${hl}" marker-end="url(#g-a${edgeKind(e)})" d="M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2 - 1},${y2}"/>`);
+    out.push(edgePath(e, `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2 - 1},${y2}`, "g", sel, forExport));
   }
   for (const n of model.nodes) {
     const { x, y } = xy.get(n.id);
@@ -400,8 +425,7 @@ function ganttSvg(forExport) {
     const a = state.byId.get(e.from), b = state.byId.get(e.to);
     const xa = X(toDay(a.finish)), ya = rowY.get(e.from) + T.ROW / 2;
     const xb = X(toDay(b.start)), yb = rowY.get(e.to) + T.ROW / 2;
-    const hl = sel && (e.from === sel || e.to === sel) ? " hl" : "";
-    out.push(`<path class="e ${edgeKind(e)}${hl}" marker-end="url(#t-a${edgeKind(e)})" d="M${xa},${ya} H${xa + 8} V${yb} H${xb - 1}"/>`);
+    out.push(edgePath(e, `M${xa},${ya} H${xa + 8} V${yb} H${xb - 1}`, "t", sel, forExport));
   }
   rows.forEach((n) => {
     const y = rowY.get(n.id) + 6, h = T.ROW - 12;
@@ -437,12 +461,22 @@ function render() {
 
 function renderSide() {
   const n = state.selected && state.byId.get(state.selected);
-  const link = (id) => {
+  const link = (id, from, to) => {
     const m = state.byId.get(id);
-    return `<li><a data-id="${esc(id)}">${esc(m ? m.title : id)}</a></li>`;
+    return `<li><a data-id="${esc(id)}">${esc(m ? m.title : id)}</a>` +
+      `<button class="unlink" data-unlink-from="${esc(from)}" data-unlink-to="${esc(to)}" title="Delete this dependency" aria-label="Delete dependency ${esc(edgeLabel({ from, to }))}">×</button></li>`;
   };
-  if (!n) {
-    $("detail").innerHTML = '<p class="empty">Click a milestone or use the arrow keys</p>';
+  const se = state.selectedEdge && findEdge(state.selectedEdge.from, state.selectedEdge.to);
+  if (se) {
+    const a = state.byId.get(se.from), b = state.byId.get(se.to);
+    $("detail").innerHTML =
+      `<dl><dt>Dependency</dt><dd>${se.violated ? "Schedule conflict" : se.critical ? "Critical path" : "Normal"}</dd>` +
+      `<dt>From</dt><dd><a class="plain" data-id="${esc(se.from)}">${esc(a.title)}</a></dd>` +
+      `<dt>To</dt><dd><a class="plain" data-id="${esc(se.to)}">${esc(b.title)}</a></dd>` +
+      `<dt>Line</dt><dd><code>${esc(se.from)} -&gt; ${esc(se.to)}</code></dd></dl>` +
+      `<button id="delete-edge" class="danger" title="Delete (Delete / Backspace)">Delete dependency</button>`;
+  } else if (!n) {
+    $("detail").innerHTML = '<p class="empty">Click a milestone or a dependency line, or use the arrow keys</p>';
   } else {
     const preds = state.preds.get(n.id), succs = state.succs.get(n.id);
     $("detail").innerHTML =
@@ -451,8 +485,8 @@ function renderSide() {
       `<dt>Duration</dt><dd>${esc(n.duration || "-")}</dd>` +
       `<dt>Status</dt><dd>${n.done ? "Done" : n.critical ? "Open · critical path" : "Open"}</dd>` +
       `<dt>File</dt><dd>${esc(n.path)}</dd></dl>` +
-      `<h2>Predecessors</h2>${preds.length ? `<ul class="links">${preds.map(link).join("")}</ul>` : '<p class="empty">None</p>'}` +
-      `<h2>Successors</h2>${succs.length ? `<ul class="links">${succs.map(link).join("")}</ul>` : '<p class="empty">None</p>'}`;
+      `<h2>Predecessors</h2>${preds.length ? `<ul class="links">${preds.map((p) => link(p, p, n.id)).join("")}</ul>` : '<p class="empty">None</p>'}` +
+      `<h2>Successors</h2>${succs.length ? `<ul class="links">${succs.map((s) => link(s, n.id, s)).join("")}</ul>` : '<p class="empty">None</p>'}`;
   }
   const ws = state.model.warnings;
   $("warn-title").textContent = `Warnings (${ws.length})`;
@@ -463,6 +497,7 @@ function renderSide() {
 
 function select(id, scroll) {
   state.selected = id;
+  state.selectedEdge = null;
   render();
   if (id && scroll !== false) {
     for (const el of document.querySelectorAll(`[data-id="${CSS.escape(id)}"]`)) {
@@ -470,6 +505,31 @@ function select(id, scroll) {
       el.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
   }
+}
+
+function selectEdge(from, to) {
+  state.selectedEdge = from ? { from, to } : null;
+  state.selected = null;
+  render();
+  if (from) setStatus(`Selected ${edgeLabel({ from, to })}. Delete removes it`);
+}
+
+// Delete one dependency, keeping the rest of deps.txt (including unknown-id lines).
+async function deleteDependency(from, to) {
+  if (savingConnection || !state.model) return;
+  const all = arr(state.model.raw_edges).map((e) => ({ from: e.from, to: e.to }));
+  const edges = all.filter((e) => !(e.from === from && e.to === to));
+  if (edges.length === all.length) { setStatus("This dependency no longer exists. Press R to reload", true); return; }
+  savingConnection = true;
+  setStatus("Deleting dependency…");
+  try {
+    await api("PUT", "/api/deps", JSON.stringify({ deps_version: state.model.deps_version, edges }));
+    if (state.selectedEdge && state.selectedEdge.from === from && state.selectedEdge.to === to) state.selectedEdge = null;
+    await load();
+    setStatus(`Dependency deleted: ${from} -> ${to}`);
+  } catch (err) {
+    setStatus("Dependency not deleted: " + err.message + ". Press R to reload before retrying.", true);
+  } finally { savingConnection = false; }
 }
 
 // ---------------------------------------------------------------- export
@@ -631,6 +691,14 @@ function moveSelection(key) {
 
 document.addEventListener("click", (ev) => {
   if (suppressClick) return;
+  const unlink = ev.target.closest("[data-unlink-from]");
+  if (unlink) { deleteDependency(unlink.dataset.unlinkFrom, unlink.dataset.unlinkTo); return; }
+  if (ev.target.closest("#delete-edge")) {
+    if (state.selectedEdge) deleteDependency(state.selectedEdge.from, state.selectedEdge.to);
+    return;
+  }
+  const hit = ev.target.closest("[data-edge-from]");
+  if (hit) { selectEdge(hit.dataset.edgeFrom, hit.dataset.edgeTo); return; }
   const w = ev.target.closest("[data-warning]");
   if (w) { const ids = state.model.warnings[+w.dataset.warning].ids.filter((id) => state.byId.has(id)); if (ids.length) select(ids[0]); return; }
   const el = ev.target.closest("[data-id]");
@@ -669,6 +737,8 @@ document.addEventListener("keydown", (ev) => {
     ArrowRight: () => moveSelection("right"), l: () => moveSelection("right"),
     "/": () => $("search").focus(),
     Escape: () => { $("help").classList.remove("open"); select(null); },
+    Delete: () => { if (state.selectedEdge) deleteDependency(state.selectedEdge.from, state.selectedEdge.to); },
+    Backspace: () => { if (state.selectedEdge) deleteDependency(state.selectedEdge.from, state.selectedEdge.to); },
     1: () => setLayout("split"), 2: () => setLayout("graph"), 3: () => setLayout("gantt"),
     "+": () => setZoom(state.zoom * 1.2), "=": () => setZoom(state.zoom * 1.2),
     "-": () => setZoom(state.zoom / 1.2), 0: () => setZoom(1),
