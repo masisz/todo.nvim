@@ -52,6 +52,7 @@ Then real Safari, on a roadmap with Japanese titles, via `:RoadmapView`:
 - [ ] Export → SVG: files open in Safari and Preview
 - [ ] Export → Mermaid: `roadmap/export/roadmap.md` renders in GitHub / VS Code preview
 - [ ] Keys: arrows, h/j/k/l, `/` search, `1`/`2`/`3`, `+`/`-`/`0`, `e`, `m`, `R`, `?`, `Esc`
+- [ ] Clicking a dependency line selects it (orange); Delete / Backspace removes it from `deps.txt`
 - [ ] ⌘ + wheel / pinch zooms the diagram, not the page
 - [ ] Editing a milestone file in Neovim updates the page within ~2 s
 - [ ] After `:RoadmapViewStop`, the red "Cannot reach Neovim" banner appears

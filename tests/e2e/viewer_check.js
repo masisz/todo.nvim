@@ -171,6 +171,49 @@ function pngSize(buf) {
       assert.strictEqual(await page.locator("#graph .e").count(), 6);
     });
 
+    // Click a point on an edge's hit path, like a user clicking on the line. `at` is a distance along
+    // the path (default: the middle); gantt lines can end under a bar, so click near their start.
+    async function clickEdge(pane, from, to, at) {
+      const sel = `${pane} .e-hit[data-edge-from="${from}"][data-edge-to="${to}"]`;
+      await page.locator(sel).scrollIntoViewIfNeeded();
+      const pt = await page.evaluate(([s, at]) => {
+        const p = document.querySelector(s);
+        const m = p.getPointAtLength(at == null ? p.getTotalLength() / 2 : at);
+        const sp = p.ownerSVGElement.createSVGPoint(); sp.x = m.x; sp.y = m.y;
+        const r = sp.matrixTransform(p.getScreenCTM());
+        return { x: r.x, y: r.y };
+      }, [sel, at]);
+      await page.mouse.click(pt.x, pt.y);
+    }
+    await check("clicking a line selects the dependency in both views", async () => {
+      await clickEdge("#graph", "20261101-01", "20261101-03");
+      assert.strictEqual(await page.locator("#graph .e.esel").count(), 1);
+      assert.strictEqual(await page.locator("#gantt .e.esel").count(), 1);
+      assert.strictEqual(await page.locator("#graph .n.sel").count(), 0);
+      const detail = await page.locator("#detail").textContent();
+      assert.ok(detail.includes("20261101-01 -> 20261101-03") && detail.includes("Delete dependency"), detail);
+      await page.keyboard.press("Escape");
+      assert.strictEqual(await page.locator("#graph .e.esel").count(), 0);
+    });
+    await check("Delete key removes the selected dependency and keeps unknown-id lines", async () => {
+      await clickEdge("#gantt", "20261101-01", "20261101-03", 16);
+      assert.strictEqual(await page.locator("#gantt .e.esel").count(), 1);
+      await page.keyboard.press("Delete");
+      await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Dependency deleted"));
+      const text = fs.readFileSync(depsFile, "utf8");
+      assert.ok(!text.includes("20261101-01 -> 20261101-03"), text);
+      assert.ok(text.includes("20261101-03 -> missing-id") && text.includes("20261101-01 -> 20261101-02"), text);
+      assert.strictEqual(await page.locator("#graph .e").count(), 5);
+      assert.strictEqual(await page.locator("#graph .e.esel").count(), 0);
+    });
+    await check("delete button in the side panel removes a dependency", async () => {
+      await page.locator('#graph .n[data-id="20261101-05"]').click();
+      await page.locator('#detail button[data-unlink-from="20261101-04"][data-unlink-to="20261101-05"]').click();
+      await page.waitForFunction(() => document.getElementById("status").textContent.startsWith("Dependency deleted"));
+      assert.ok(!fs.readFileSync(depsFile, "utf8").includes("20261101-04 -> 20261101-05"));
+      assert.strictEqual(await page.locator("#graph .e").count(), 4);
+    });
+
     const exportDir = path.join(dir, "roadmap", "export");
     for (const name of ["graph.png", "gantt.png", "roadmap.png", "graph.svg", "gantt.svg", "roadmap.svg", "mermaid"]) {
       await check(`export ${name}`, async () => {

@@ -130,6 +130,10 @@ Neovim on `127.0.0.1` and opens the viewer in the default browser
 - drag the dot on a milestone's right edge onto its successor in the dependency
   graph to save a connection to `deps.txt`; press Esc or drop on empty space to
   cancel. Duplicate connections and cycles are rejected. Dates are unchanged.
+- click a dependency line (in the graph or the gantt) to select it, then press
+  Delete / Backspace or the "Delete dependency" button in the side panel to
+  remove it from `deps.txt`. The `×` next to each predecessor/successor in the
+  side panel deletes that dependency too. Lines that refer to unknown ids are kept.
 - red dashed arrows: the successor starts before its predecessor is due
 - red outline: critical path (the chain that drives the latest finish)
 - side panel with predecessors/successors and warnings (unknown ids, cycles,
