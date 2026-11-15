@@ -20,9 +20,9 @@ A lightweight, distraction-free todo management plugin for Neovim.
   "masisz/todo.nvim",
   cmd = { "TodoNew", "TodoList", "RoadmapNew", "RoadmapList" },
   keys = {
-    { "<leader>Tn", "<Cmd>TodoNew<CR>", desc = "Create new todo" },
-    { "<leader>Tl", "<Cmd>TodoList<CR>", desc = "Open todo list" },
-    { "<leader>Tr", "<Cmd>RoadmapList<CR>", desc = "Open roadmap" },
+    { "<leader>tn", "<Cmd>TodoNew<CR>", desc = "Create new todo" },
+    { "<leader>tl", "<Cmd>TodoList<CR>", desc = "Open todo list" },
+    { "<leader>tr", "<Cmd>RoadmapList<CR>", desc = "Open roadmap" },
   },
   opts = {
     directory = "~/todos", -- todo files directory
@@ -30,6 +30,18 @@ A lightweight, distraction-free todo management plugin for Neovim.
   },
 }
 ```
+
+> [!WARNING]
+> **Breaking Change for LazyVim Users**:
+> Default keybindings have changed from `<leader>T...` to `<leader>t...` (`<leader>tl`, `<leader>tr`, `<leader>tn`) for easier typing.
+> In standard LazyVim, `<leader>t` might be assigned to terminal or test commands. If you experience a conflict or wish to keep the old `<leader>T...` prefix, override the keys in your `lazy.nvim` spec:
+> ```lua
+> keys = {
+>   { "<leader>Tn", "<Cmd>TodoNew<CR>", desc = "Create new todo" },
+>   { "<leader>Tl", "<Cmd>TodoList<CR>", desc = "Open todo list" },
+>   { "<leader>Tr", "<Cmd>RoadmapList<CR>", desc = "Open roadmap" },
+> }
+> ```
 
 ## Configuration
 
@@ -151,16 +163,16 @@ need a per-session token that only the opened URL carries.
 
 | Command | Default key | Description |
 | --- | --- | --- |
-| `:TodoNew` | `<leader>Tn`* | Create and open a new daily todo |
-| `:TodoList` | `<leader>Tl` | Open daily todos in a right-hand pane |
+| `:TodoNew` | `<leader>tn`* | Create and open a new daily todo |
+| `:TodoList` | `<leader>tl` | Open daily todos in a right-hand pane |
 | `:RoadmapNew` | | Create and open a new milestone in `roadmap/` |
-| `:RoadmapList` | `<leader>Tr` | Open milestones with their linked todos in a right-hand pane |
+| `:RoadmapList` | `<leader>tr` | Open milestones with their linked todos in a right-hand pane |
 | `:RoadmapView` | | Open the dependency graph and gantt in a browser |
 | `:RoadmapViewStop` | | Stop the viewer server |
 | `:RoadmapExport [mermaid]` | | Write `roadmap/export/roadmap.md` (Mermaid) |
 
-\* Set in the lazy.nvim example above; the plugin itself maps only `<leader>Tl`
-and `<leader>Tr`. `TaskNew` and `TaskList` remain available as compatibility
+\* Set in the lazy.nvim example above; the plugin itself maps only `<leader>tl`
+and `<leader>tr`. `TaskNew` and `TaskList` remain available as compatibility
 aliases.
 
 ### Keys in `:TodoList`
